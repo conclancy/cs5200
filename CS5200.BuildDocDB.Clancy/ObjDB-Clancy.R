@@ -7,6 +7,7 @@ rootDir <- "docDB"
 #' @param root the name of the root directory for the database.
 #' @param path the path to create the root directory.  Defaults to the current
 #'             working directory if one is not provided.
+#' @return void
 #'             
 configDB <- function(root = rootDir, path = getwd()) {
   
@@ -27,7 +28,7 @@ configDB <- function(root = rootDir, path = getwd()) {
 #' 
 #' @param root the name of the root directory for the database. 
 #' @param tag  the tag of the object to that will be used to create the path. 
-#' @return the path of the object, as a String. 
+#' @return the path of the object, as a Character Vector.  
 #' 
 genObjPath <- function(root = rootDir, tag) {
   
@@ -42,6 +43,7 @@ genObjPath <- function(root = rootDir, tag) {
 #' Get the tags from a file given the file name
 #' 
 #' @param fileName the name of the file to be parsed. 
+#' @returns void
 #'
 getTags <- function(fileName) {
   
@@ -74,12 +76,15 @@ getTags <- function(fileName) {
 }
 
 
+#' Get the file name of an image that may or may not contain tags. 
 #'
+#'@param fileName the name of the file to be isolated
+#'@returns the name of the file, as characters, 
 #'
 getFileName <- function(fileName) {
   
   # Ensure there is at least one space in front of a file extension
-  fileName <- sub(".", " .", fileName)
+  fileName <- sub("\\.", " .", fileName)
   
   # Split the file name into tokens using the space between the characters.
   tokens <- strsplit(fileName, " ")[[1]]
@@ -98,12 +103,50 @@ getFileName <- function(fileName) {
   # remove the NA pieces from the vector. 
   pathPieces <- pathPieces[!is.na(pathPieces)]
   
-  return (paste(pathPieces))
-  
+  return (paste(pathPieces, sep = " ", collapse = ""))
 }
 
-storeObjs <- function(folder, root) {
+
+#' Copies all files in the specified folder to their correct folders underneath 
+#' root.
+#' 
+#' @param folder the folder containing the files to be copied. This function 
+#'               assumes that the folder is in the current working directory. 
+#' @param root   the root directory where files should be placed. 
+#' @returns void 
+#' 
+storeObjs <- function(folder, root = rootDir) {
   
+  # Create path variables 
+  cwd <- getwd()
+  folderForCopy <- paste(cwd, folder, sep = "/")
+  
+  # Logic to handle folder existence 
+  if(dir.exists(folderForCopy)) {
+    files <- list.files(folderForCopy)
+    
+    # create folders and copy files 
+    for (f in files) {
+      
+      # create folders if they do not already exist 
+      tags <- getTags(f)
+      
+      for(tag in tags) {
+        folder <- genObjPath(tag = tag)
+        
+        if(!dir.exists(folder)) {
+          dir.create(folder)
+        }
+        
+        fileToCopy <- paste(folderForCopy, f, sep="/")
+        fileToPaste <- paste(folder, getFileName(f), sep ="/")
+        
+        file.copy(fileToCopy, fileToPaste)
+      }
+    }
+  } else {
+    print("Error: The input directory does not exist.")
+  }
 }
 
 clearDB <- function(root = rootDir) {
@@ -128,6 +171,10 @@ main <- function() {
   # Get fileName 
   print(getFileName("CampusAtNight #Northeastern #ISEC.jpg"))
   print(getFileName("CampusAtNight.jpg #Northeastern #ISEC"))
+  
+  # Test to ensure the object storage method is working 
+  storeObjs("images")
+  storeObjs("test")
 }
 
 #########################################################
