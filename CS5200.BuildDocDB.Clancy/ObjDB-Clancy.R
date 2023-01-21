@@ -1,4 +1,27 @@
+#' This program creates a document store that uses folders as a means to 
+#' organize data. The "records" that are stored are images. Images can be 
+#' tagged. Each folder represents a tag. 
+#' 
+#' @author:     Connor Clancy
+#' @email:      clancy.co@northeastern.edu
+#' @published:  21 JAN 2023
+#' @assignment: Homework 1 - CS5200 - Spring 2023
+#' 
+
+
+# Create global variables.
 rootDir <- "docDB"
+
+
+#' Helper method to get the number of directories and files located in the 
+#' 'database' directory passed to the function. 
+#' 
+#' @param root path for the directory of the database 
+#' @return the number of items in the database, as an integer. 
+#' 
+databaseSize <- function(root = rootDir) {
+  return(length(list.files(path = root)) + length(list.dirs(path = root))) 
+}
 
 
 #' Configure the "database" in the form of a directory.  If the database already
@@ -16,11 +39,7 @@ configDB <- function(root = rootDir, path = getwd()) {
   
   if(!dir.exists(root)) {
     dir.create(root)
-    print("Created database")
-  } else {
-    print("Existing database")
-  }
-  
+  } 
 }
 
 
@@ -144,37 +163,166 @@ storeObjs <- function(folder, root = rootDir) {
         file.copy(fileToCopy, fileToPaste)
       }
     }
-  } else {
-    print("Error: The input directory does not exist.")
-  }
+  } 
 }
 
+#' Removes all folders and files in the folder passed as `root`. This function
+#' does not remove the root itself. 
+#' 
+#' @param root the directory to be cleared of files and folders 
+#' @return the number of items in the database 
+#'
 clearDB <- function(root = rootDir) {
+  files <- list.files(path = root)
   
+  setwd(root)
+  
+  for (f in files) {
+    unlink(f, recursive = TRUE)
+  }
+  
+  return(databaseSize(root = root)) 
 }
+
 
 #' The main entry point into the script. 
 #' 
 main <- function() {
   
-  # Test config Database
+  errors = 0
+  
+  #######################################
+  #                Test 1               #
+  #     Test Database Configuration     #
+  #######################################
+  
+  # Delete the root directory to ensure a clean start to the test. 
+  if (dir.exists(rootDir))
+  {
+    unlink(rootDir)
+  }
+  
+  # Create database 
   configDB(rootDir)
   
-  # Test genObjPath
-  print(genObjPath(rootDir, "#hashTest"))
-  print(genObjPath(rootDir, "noHashTest"))
+  # Increment if errors 
+  if (databaseSize() != 1) {
+    errors <- errors + 1
+    print("Error: (Test 1.0) The database size does not equal 0.")
+  }
   
-  # Test getTags
-  print(getTags("CampusAtNight #Northeastern #ISEC.jpg"))
-  print(getTags("CampusAtNight.jpg #Northeastern #ISEC"))
   
-  # Get fileName 
-  print(getFileName("CampusAtNight #Northeastern #ISEC.jpg"))
-  print(getFileName("CampusAtNight.jpg #Northeastern #ISEC"))
+  #######################################
+  #                Test 2               #
+  #     Test Object Path Generation     #
+  #######################################
+  
+  # test if the path has a tag
+  if(!genObjPath(rootDir, "#hashTest") == "docDB/hashTest") {
+    errors <- errors + 1
+    print("Error: (Test 2.0) Tag test has failed.")
+  }
+  
+  # test if the path has a tag
+  if(!genObjPath("test", "#hashTest") == "test/hashTest") {
+    errors <- errors + 1
+    print("Error: (Test 2.1) Tag test has failed.")
+  }
+  
+  # test if the object does not have a tag
+  if(!genObjPath(rootDir, "noHashTest") == "docDB/noHashTest") {
+    errors <- errors + 1
+    print("Error: (Test 2.2) Tag test has failed.")
+  }
+  
+
+  #######################################
+  #                Test 3               #
+  #         Test Tag Generation         #
+  #######################################  
+  
+  test_tags = c("#Northeastern", "#ISEC")
+  
+  if(!all(test_tags == getTags("CampusAtNight #Northeastern #ISEC.jpg"))) {
+    errors <- errors + 1
+    print("Error: (Test 3.0): Tag generation has failed.")
+  }
+  
+  if(!all(test_tags == getTags("CampusAtNight.jpg #Northeastern #ISEC"))) {
+    errors <- errors + 1
+    print("Error: (Test 3.1): Tag generation has failed.")
+  }
+  
+  
+  #######################################
+  #                Test 4               #
+  #      Test File Name Generation      #
+  #######################################  
+  
+  file_name = "CampusAtNight.jpg"
+  
+  if(getFileName("CampusAtNight #Northeastern #ISEC.jpg") != file_name) {
+    errors <- errors + 1
+    print("Error: (Test 4.0): File name generation has failed.")
+  }
+  
+  if(getFileName("CampusAtNight.jpg #Northeastern #ISEC") != file_name) {
+    errors <- errors + 1
+    print("Error: (Test 4.1): File name generation has failed.")
+  }
+
+  
+  #######################################
+  #                Test 5               #
+  #         Test Object Creation        #
+  ####################################### 
+  
+  # Database should be empty at this point
+  if(databaseSize(root = rootDir) != 1) {
+    errors <- errors + 1
+    print("Error: (Test 5.0): The database size is not 0.")
+  }
   
   # Test to ensure the object storage method is working 
   storeObjs("images")
   storeObjs("test")
+  
+  # There should now be 11 objects in the database 
+  if(databaseSize() != 11) {
+    errors <- errors + 1
+    print("Error: (Test 5.1): The database size is not 11.")
+  }
+ 
+  
+  #######################################
+  #                Test 6               #
+  #         Test Object Creation        #
+  ####################################### 
+  
+  # Clear the current database.
+  clearDB()
+  
+  # Test to ensure the clearDB() method removed the objects. 
+  if(databaseSize(root = rootDir) != 0) {
+    errors <- errors + 1
+    print("Error: (Test 5.0): The database size is not 0.")
+  }
+  
+  
+  #######################################
+  #            Test Output              #
+  #         Print Final Results         #
+  ####################################### 
+  
+  if(errors == 0) {
+    print("#######################################")
+    print("All tests Passed!")
+    print("#######################################")
+  } else {
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    print(paste(errors, "tests failed!  See messages above!", sep = " "))
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+  }
 }
 
 #########################################################
