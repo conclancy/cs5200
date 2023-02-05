@@ -1,0 +1,152 @@
+---
+title: "Implement Relational Database - Clancy"
+output: html_notebook
+---
+
+# Overview 
+
+Assignment 3 for CS 5200 Spring 2023. This assignment uses R and SQL code chunks
+to create a database and corresponding tables. 
+
+```{r}
+library(RSQLite)
+
+fpath = getwd()
+dbfile = "/modules.sqlite"
+
+# connect to the database if exists, else create a new database
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath, dbfile))
+```
+
+```{sql connection=dbcon}
+PRAGMA foreign_keys = ON
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS lookupAffiliation;
+```
+
+```{sql connection=dbcon}
+CREATE TABLE lookupAffiliation(
+  affiliationID INTEGER PRIMARY KEY AUTOINCREMENT, 
+  affiliation TEXT NOT NULL
+);
+```
+
+```{sql connection=dbcon}
+INSERT INTO lookupAffiliation(affiliation) VALUES
+  ("PT"),
+  ("FT"), 
+  ("Contract")
+```
+
+```{sql connection=dbcon}
+SELECT * FROM lookupAffiliation;
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS Author;
+```
+
+```{sql connection=dbcon}
+CREATE TABLE Author(
+  aid INTEGER PRIMARY KEY AUTOINCREMENT, 
+  name TEXT NOT NULL, 
+  email TEXT NOT NULL, 
+  affiliationId INTEGER NOT NULL, 
+  FOREIGN KEY (affiliationId) REFERENCES lookupAffiliation(affiliationID)
+);
+```
+
+```{sql connection=dbcon}
+INSERT INTO Author(name, email, affiliationId) VALUES
+  ("Connor", "clancy.co@northeastern.edu", 3),
+  ("Martin", "m.schedlbauer@northeastern.edu", 2), 
+  ("Urvin", "desai.u@northeastern.edu", 1),
+  ("Kate", "everett.ka@northeastern.edu", 1)
+```
+
+```{sql connection=dbcon}
+SELECT * FROM Author;
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS Module;
+```
+
+```{sql connection=dbcon}
+CREATE TABLE Module (
+  number TEXT PRIMARY KEY, 
+  title TEXT NOT NULL, 
+  lengthInMin INTEGER NOT NULL
+);
+```
+
+```{sql connection=dbcon}
+INSERT INTO Module(number, title, lengthInMin) VALUES
+  ("module1", "Database Systems", 120),
+  ("module2", "Database Modeling", 180), 
+  ("module3", "Relational Database Design & Normalization", 180),
+  ("module4", "Database Schema", 45)
+```
+
+```{sql connection=dbcon}
+SELECT * FROM Module;
+```
+
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS joinModuleAuthor;
+```
+
+```{sql connection=dbcon}
+CREATE TABLE joinModuleAuthor (
+  jmaId INTEGER PRIMARY KEY AUTOINCREMENT, 
+  moduleNumber TEXT NOT NULL, 
+  aid INTEGER NOT NULL, 
+  FOREIGN KEY (moduleNumber) REFERENCES Module(number), 
+  FOREIGN KEY (aid) REFERENCES Author(aid)
+);
+```
+
+```{sql connection=dbcon}
+INSERT INTO joinModuleAuthor(moduleNumber, aid) VALUES
+  ("module1", 1),
+  ("module2", 1), 
+  ("module1", 2),
+  ("module2", 2),
+  ("module3", 2),
+  ("module4", 2),
+  ("module1", 3),
+  ("module2", 3),
+  ("module3", 4),
+  ("module4", 4)
+```
+
+```{sql connection=dbcon}
+SELECT * FROM joinModuleAuthor;
+```
+
+```{sql connection=dbcon}
+SELECT 
+  a.aid, 
+  a.name, 
+  a.email, 
+  l.affiliation, 
+  jma.moduleNumber, 
+  m.title, 
+  m.lengthInMin
+FROM Author AS a
+JOIN lookupAffiliation AS l 
+  ON a.affiliationId = l.affiliationId
+JOIN joinModuleAuthor AS jma
+  ON a.aid = jma.aid
+JOIN Module AS m
+  ON jma.moduleNumber = m.number
+```
+
+```{r}
+# disconnect the current database session.
+dbDisconnect(dbcon)
+```
+
+
