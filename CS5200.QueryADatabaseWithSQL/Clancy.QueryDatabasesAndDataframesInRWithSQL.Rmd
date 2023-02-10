@@ -1,0 +1,65 @@
+---
+title: "Query Databases and Dataframes in R with SQL"
+output: html_notebook
+---
+
+# Overview
+TODO
+
+```{r}
+library(RSQLite)
+library(sqldf)
+
+fpath = getwd()
+dbfile = "/MediaDB.db"
+
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath, dbfile))
+```
+
+# Question 1
+```{r}
+rs <- dbGetQuery(dbcon, "SELECT * FROM invoice_items")
+head(rs)
+```
+
+```{r}
+rs$ItemPrice <- rs$UnitPrice * rs$Quantity
+head(rs)
+```
+
+```{r}
+round(mean(rs[['ItemPrice']], trim=.01), 2)
+```
+
+# Question 2 
+```{r}
+it <- sqldf("SELECT InvoiceID, COUNT(InvoiceLineID) AS item_count, SUM(ItemPrice) AS invoice_total FROM rs GROUP BY InvoiceID")
+head(it)
+```
+
+# Question 3
+```{r}
+plot(
+  it$item_count, 
+  it$invoice_total,
+  type = "b",
+  xlab = "Invoice Items",
+  ylab = "Invoice Total Cost"
+)
+```
+
+
+```{r}
+# Invoices without a discount
+full <- sqldf("SELECT InvoiceId, item_count, invoice_total AS invoice_subtotal FROM it WHERE item_count <= 10")
+full$invoice_total <- full$invoice_subtotal
+
+# Invoices with a discount 
+disc <- sqldf("SELECT InvoiceId, item_count, invoice_total AS invoice_subtotal FROM it WHERE item_count > 10")
+disc$invoice_total <- round(disc$invoice_subtotal * .9, 2)
+
+sqldf("SELECT * FROM (SELECT * FROM full UNION ALL SELECT * FROM disc) ORDER BY InvoiceId")
+```
+
+## TODO Redo with proper instructions
+
