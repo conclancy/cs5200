@@ -1,0 +1,83 @@
+---
+title: "Query A Database with SQL"
+output: html_notebook
+---
+
+# Overview
+TODO
+
+```{r}
+library(RSQLite)
+
+fpath = getwd()
+dbfile = "/MediaDB.db"
+
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath, dbfile))
+```
+
+```{sql connection=dbcon}
+SELECT DISTINCT
+  LastName, 
+  City, 
+  State, 
+  Country
+FROM customers AS c
+INNER JOIN invoices AS i 
+  ON c.CustomerId = i.CustomerId
+WHERE Country IN ('Brazil', 'Canada');
+```
+
+```{sql connection=dbcon}
+SELECT 
+  Title, 
+  COUNT(t.TrackId) AS 'NumberOfTracks'
+FROM albums AS a
+INNER JOIN tracks AS t ON
+  a.AlbumId = t.AlbumId
+GROUP BY 
+  a.Title;
+```
+
+```{sql connection=dbcon}
+SELECT 
+  g.Name AS genre, 
+  COUNT(t.TrackId) AS track_count
+FROM genres AS g
+LEFT JOIN tracks AS t 
+  ON g.GenreId = t.GenreId
+GROUP BY 
+  g.Name
+HAVING 
+  COUNT(t.TrackId) >= 5
+ORDER BY 
+  COUNT(t.TrackId) DESC
+```
+
+```{sql connection=dbcon}
+SELECT 
+*
+FROM tracks AS g
+```
+
+
+```{sql connection=dbcon}
+SELECT 
+  ROUND(AVG(sub.months), 0) AS average_tenure
+FROM(
+  SELECT 
+    EmployeeId, 
+    (
+      ((STRFTIME('%Y', 'now') -  STRFTIME('%Y', HireDate))*12) --years as months
+      + (STRFTIME('%m', 'now') -  STRFTIME('%m', HireDate)) --months 
+    ) AS months
+  FROM employees
+) AS sub
+```
+
+```{sql connection=dbcon}
+SELECT 
+  * 
+FROM 
+```
+
+
