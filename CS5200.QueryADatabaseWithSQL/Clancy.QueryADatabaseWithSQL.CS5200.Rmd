@@ -76,8 +76,86 @@ FROM(
 
 ```{sql connection=dbcon}
 SELECT 
-  * 
-FROM 
+  State,
+  COUNT(DISTINCT i.CustomerId) AS customer_count
+FROM customers AS c
+INNER JOIN invoices AS i
+  ON c.CustomerId = i.CustomerId
+WHERE c.Country = "Brazil"
+GROUP BY
+  c.State
+ORDER BY 
+  c.State
 ```
+
+```{sql connection=dbcon}
+SELECT DISTINCT
+ COUNT(c.CustomerId) AS customer_count
+FROM customers AS c
+LEFT JOIN invoices AS i
+  ON c.CustomerId = i.CustomerId
+WHERE i.InvoiceId IS NULL
+```
+
+```{sql connection=dbcon}
+SELECT 
+  COUNT(Title) AS title_symphony_count
+FROM albums
+WHERE LOWER(Title) LIKE "%symphony%"
+```
+
+```{sql connection=dbcon}
+SELECT 
+  ar.Name AS artist_name, 
+  ROUND(SUM(t.Milliseconds)/3600000.0, 2) AS track_time
+FROM tracks AS t 
+INNER JOIN albums AS ab
+  ON t.AlbumID = ab.AlbumId
+INNER JOIN artists AS ar 
+  ON ab.ArtistId = ar.ArtistId
+GROUP BY 
+  ar.Name
+```
+
+```{sql connection=dbcon}
+SELECT 
+  p.Name AS playlist_name, 
+  ROUND(SUM(t.Milliseconds)/3600000.0, 2) AS playlist_hours,
+  ROUND(SUM(t.Milliseconds)/60000.0, 2) AS playlist_hours
+FROM playlists AS p
+INNER JOIN playlist_track AS pt
+  ON p.PlaylistId = pt.PlaylistId
+INNER JOIN tracks AS t 
+  ON pt.TrackId = t.TrackId
+GROUP BY 
+  p.Name
+ORDER BY 
+  ROUND(SUM(t.Milliseconds)/3600000.0, 2) DESC
+```
+
+
+```{sql connection=dbcon}
+SELECT 
+  ar.Name AS artist_name, 
+  COUNT(DISTINCT g.GenreId) AS genre_count
+FROM artists AS ar
+INNER JOIN albums AS ab
+  ON ar.ArtistId = ab.ArtistId
+INNER JOIN tracks AS t
+  ON ab.AlbumId = t.AlbumId 
+INNER JOIN genres AS g 
+  ON t.GenreId = g.GenreId 
+GROUP BY 
+  ar.Name
+HAVING 
+  COUNT(DISTINCT g.GenreId) > 3
+ORDER BY
+  COUNT(DISTINCT g.GenreId)
+```
+
+```{r}
+dbDisconnect(dbcon)
+```
+
 
 
