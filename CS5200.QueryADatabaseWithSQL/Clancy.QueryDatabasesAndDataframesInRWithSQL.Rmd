@@ -48,6 +48,7 @@ plot(
 )
 ```
 
+# Question 4
 
 ```{r}
 # Invoices without a discount
@@ -58,8 +59,18 @@ full$invoice_total <- full$invoice_subtotal
 disc <- sqldf("SELECT InvoiceId, item_count, invoice_total AS invoice_subtotal FROM it WHERE item_count > 10")
 disc$invoice_total <- round(disc$invoice_subtotal * .9, 2)
 
-sqldf("SELECT * FROM (SELECT * FROM full UNION ALL SELECT * FROM disc) ORDER BY InvoiceId")
+inv_items <- sqldf("SELECT * FROM (SELECT * FROM full UNION ALL SELECT * FROM disc) ORDER BY InvoiceId")
+head(inv_items)
 ```
 
-## TODO Redo with proper instructions
+```{r}
+inv <- dbGetQuery(dbcon, "SELECT * FROM invoices")
+head(inv)
+```
+
+```{r}
+disc_inv <- sqldf("SELECT inv.*, ii.invoice_total AS DiscPrice FROM inv LEFT JOIN inv_items AS ii ON inv.InvoiceId = ii.InvoiceId ")
+head(disc_inv)
+```
+
 
