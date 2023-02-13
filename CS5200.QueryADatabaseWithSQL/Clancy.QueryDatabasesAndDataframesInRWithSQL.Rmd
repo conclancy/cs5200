@@ -1,11 +1,16 @@
 ---
 title: "Query Databases and Dataframes in R with SQL"
 output: html_notebook
+author: "clancy.co@northeastern.edu"
+date: "13 Feb 2023"
 ---
 
 # Overview
-TODO
+This notebook contains the code for the _Query a Database with SQL_ assignment.
+This notebook assumes you have a connection to the `MediaDB.db` file provided as
+part of the assignment on campus located in the same directory as this notebook.
 
+# Assignment Work 
 ```{r}
 library(RSQLite)
 library(sqldf)
@@ -16,29 +21,21 @@ dbfile = "/MediaDB.db"
 dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath, dbfile))
 ```
 
-# Question 1
-```{r}
+## Question 1 - Add ItemPrice Column & Get Trimmed Mean
+```{r questionOne}
 rs <- dbGetQuery(dbcon, "SELECT * FROM invoice_items")
-head(rs)
-```
-
-```{r}
 rs$ItemPrice <- rs$UnitPrice * rs$Quantity
-head(rs)
-```
-
-```{r}
 round(mean(rs[['ItemPrice']], trim=.01), 2)
 ```
 
-# Question 2 
-```{r}
+## Question 2 - Invoice Total
+```{r questionTwo}
 it <- sqldf("SELECT InvoiceID, COUNT(InvoiceLineID) AS item_count, SUM(ItemPrice) AS invoice_total FROM rs GROUP BY InvoiceID")
 head(it)
 ```
 
-# Question 3
-```{r}
+## Question 3 - Graph the Results from Question 2
+```{r questionThree}
 plot(
   it$item_count, 
   it$invoice_total,
@@ -48,29 +45,23 @@ plot(
 )
 ```
 
-# Question 4
-
-```{r}
+## Question 4 - Discount Invoice Total
+```{r questionFour}
 # Invoices without a discount
 full <- sqldf("SELECT InvoiceId, item_count, invoice_total AS invoice_subtotal FROM it WHERE item_count <= 10")
-full$invoice_total <- full$invoice_subtotal
+full$DiscPrice <- full$invoice_subtotal
 
 # Invoices with a discount 
 disc <- sqldf("SELECT InvoiceId, item_count, invoice_total AS invoice_subtotal FROM it WHERE item_count > 10")
-disc$invoice_total <- round(disc$invoice_subtotal * .9, 2)
+disc$DiscPrice <- round(disc$invoice_subtotal * .9, 2)
 
 inv_items <- sqldf("SELECT * FROM (SELECT * FROM full UNION ALL SELECT * FROM disc) ORDER BY InvoiceId")
+```
+
+## Question 5 - Show question 4 worked
+Discount can be seen on InvoiceId = 5, being discounted from 13.86 -> 12.47
+```{r questionFive}
 head(inv_items)
-```
-
-```{r}
-inv <- dbGetQuery(dbcon, "SELECT * FROM invoices")
-head(inv)
-```
-
-```{r}
-disc_inv <- sqldf("SELECT inv.*, ii.invoice_total AS DiscPrice FROM inv LEFT JOIN inv_items AS ii ON inv.InvoiceId = ii.InvoiceId ")
-head(disc_inv)
 ```
 
 
