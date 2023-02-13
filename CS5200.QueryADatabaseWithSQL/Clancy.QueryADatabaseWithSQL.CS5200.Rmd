@@ -1,12 +1,17 @@
 ---
 title: "Query A Database with SQL"
 output: html_notebook
+author: "clancy.co@northeastern.edu"
+date: "13 Feb 2023"
 ---
 
 # Overview
-TODO
+This notebook contains the code for the _Query a Database with SQL_ assignment.
+This notebook assumes you have a connection to the `MediaDB.db` file provided as
+part of the assignment on campus located in the same directory as this notebook.
 
-```{r}
+# Assignment Answers 
+```{r database_connection}
 library(RSQLite)
 
 fpath = getwd()
@@ -15,7 +20,8 @@ dbfile = "/MediaDB.db"
 dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath, dbfile))
 ```
 
-```{sql connection=dbcon}
+## Question 1 - Customer Information
+```{sql questionOne, connection=dbcon}
 SELECT DISTINCT
   LastName, 
   City, 
@@ -27,7 +33,8 @@ INNER JOIN invoices AS i
 WHERE Country IN ('Brazil', 'Canada');
 ```
 
-```{sql connection=dbcon}
+## Question 2 - Album Title and Track Count
+```{sql questionTwo, connection=dbcon}
 SELECT 
   Title, 
   COUNT(t.TrackId) AS 'NumberOfTracks'
@@ -38,7 +45,8 @@ GROUP BY
   a.Title;
 ```
 
-```{sql connection=dbcon}
+## Question 3 - Tracks per Genre
+```{sql questionThree, connection=dbcon}
 SELECT 
   g.Name AS genre, 
   COUNT(t.TrackId) AS track_count
@@ -53,14 +61,8 @@ ORDER BY
   COUNT(t.TrackId) DESC
 ```
 
-```{sql connection=dbcon}
-SELECT 
-*
-FROM tracks AS g
-```
-
-
-```{sql connection=dbcon}
+## Question 4 - Average Tenure
+```{sql questionFour, connection=dbcon}
 SELECT 
   ROUND(AVG(sub.months), 0) AS average_tenure
 FROM(
@@ -74,7 +76,8 @@ FROM(
 ) AS sub
 ```
 
-```{sql connection=dbcon}
+## Question 5 - Unique Customers from Brazilian States
+```{sql questionFive, connection=dbcon}
 SELECT 
   State,
   COUNT(DISTINCT i.CustomerId) AS customer_count
@@ -88,7 +91,8 @@ ORDER BY
   c.State
 ```
 
-```{sql connection=dbcon}
+## Question 6 - Customers who have not made purchases
+```{sql questionSix, connection=dbcon}
 SELECT DISTINCT
  COUNT(c.CustomerId) AS customer_count
 FROM customers AS c
@@ -97,14 +101,16 @@ LEFT JOIN invoices AS i
 WHERE i.InvoiceId IS NULL
 ```
 
-```{sql connection=dbcon}
+## Question 7 - "Symphony" Titled Albums
+```{sql questionSeven, connection=dbcon}
 SELECT 
   COUNT(Title) AS title_symphony_count
 FROM albums
 WHERE LOWER(Title) LIKE "%symphony%"
 ```
 
-```{sql connection=dbcon}
+## Question 8 - Total Time of Track in Hours, by Artist
+```{sql questionEight, connection=dbcon}
 SELECT 
   ar.Name AS artist_name, 
   ROUND(SUM(t.Milliseconds)/3600000.0, 2) AS track_time
@@ -117,7 +123,8 @@ GROUP BY
   ar.Name
 ```
 
-```{sql connection=dbcon}
+## Question 9 - Playlist in Descending Order by Total Time
+```{sql questionNine, connection=dbcon}
 SELECT 
   p.Name AS playlist_name, 
   ROUND(SUM(t.Milliseconds)/3600000.0, 2) AS playlist_hours,
@@ -133,8 +140,8 @@ ORDER BY
   ROUND(SUM(t.Milliseconds)/3600000.0, 2) DESC
 ```
 
-
-```{sql connection=dbcon}
+## Question 10 - Artist with Tracks of 3 or More Genres.
+```{sql questionTen, connection=dbcon}
 SELECT 
   ar.Name AS artist_name, 
   COUNT(DISTINCT g.GenreId) AS genre_count
