@@ -35,13 +35,21 @@ head(it)
 ```
 
 ## Question 3 - Graph the Results from Question 2
+```{r}
+
+```
+
+
 ```{r questionThree}
+averages <- sqldf("SELECT item_count, avg(invoice_total) AS avg_invoice_cost FROM it GROUP BY item_count ORDER BY item_count" )
+
 plot(
-  it$item_count, 
-  it$invoice_total,
+  averages$item_count, 
+  averages$avg_invoice_cost,
   type = "b",
   xlab = "Invoice Items",
-  ylab = "Invoice Total Cost"
+  ylab = "Invoice Total Cost", 
+  main= "Average Invoice Cost by Item Count"
 )
 ```
 
@@ -64,4 +72,6 @@ Discount can be seen on InvoiceId = 5, being discounted from 13.86 -> 12.47
 head(inv_items)
 ```
 
-
+```{r}
+dbDisconnect(dbcon)
+```
