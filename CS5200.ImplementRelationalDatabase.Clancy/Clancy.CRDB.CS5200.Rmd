@@ -19,7 +19,7 @@ dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath, dbfile))
 ```
 
 ```{sql connection=dbcon}
-PRAGMA foreign_keys = ON
+PRAGMA foreign_keys = OFF
 ```
 
 ```{sql connection=dbcon}
@@ -58,12 +58,29 @@ CREATE TABLE Author(
 );
 ```
 
+```{sql buildTrigerOne, connection=dbcon}
+CREATE TRIGGER IF NOT EXISTS TriggerAuthorEmailFormat
+  BEFORE INSERT ON Author
+  BEGIN
+    SELECT 
+      CASE 
+        WHEN NEW.email NOT LIKE '%_@__%.__%' THEN RAISE (ABORT, 'Invalid Email Format')
+      END;
+  END;
+```
+
+
 ```{sql connection=dbcon}
 INSERT INTO Author(name, email, affiliationId) VALUES
   ("Connor", "clancy.co@northeastern.edu", 3),
   ("Martin", "m.schedlbauer@northeastern.edu", 2), 
   ("Urvin", "desai.u@northeastern.edu", 1),
   ("Kate", "everett.ka@northeastern.edu", 1)
+```
+
+```{sql testTriggerOne, connection=dbcon}
+INSERT INTO Author(name, email, affiliationId) VALUES
+  ("Michael", "michael@northeastern", 3)
 ```
 
 ```{sql connection=dbcon}
@@ -82,12 +99,28 @@ CREATE TABLE Module (
 );
 ```
 
+```{sql buildTrigerTwo, connection=dbcon}
+CREATE TRIGGER IF NOT EXISTS TriggerModleLengthPositive 
+  BEFORE INSERT ON Module
+  BEGIN
+    SELECT 
+      CASE 
+        WHEN NEW.lengthInMin < 0 THEN RAISE (ABORT, 'Module length must be positive')
+      END;
+  END;
+```
+
 ```{sql connection=dbcon}
 INSERT INTO Module(number, title, lengthInMin) VALUES
   ("module1", "Database Systems", 120),
   ("module2", "Database Modeling", 180), 
   ("module3", "Relational Database Design & Normalization", 180),
   ("module4", "Database Schema", 45)
+```
+
+```{sql testTriggerTwo, connection=dbcon}
+INSERT INTO Module(number, title, lengthInMin) VALUES
+  ("module5", "Database Systems", -1)
 ```
 
 ```{sql connection=dbcon}
