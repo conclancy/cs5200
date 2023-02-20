@@ -1,0 +1,51 @@
+---
+title: 'Practicum I - Bird Strike Database'
+author: 
+- 'Connor Clancy'
+date: 'Spring 2023'
+---
+
+## Connect to Database
+```{r database_connection}
+library(RMySQL)
+
+db_user <- 'admin'
+db_password <- 'Northea$tern23'
+db_name <- 'practicumOne'
+db_host <- 'cclancy-cs5200.cbowkysg1oyc.us-east-2.rds.amazonaws.com'
+db_port <- 3306
+
+dbcon <- dbConnect(MySQL(), user = db_user, password = db_password,
+                   dbname = db_name, host = db_host, port = db_port)
+```
+
+## Create Database (Task 4)
+
+### 4A - Incidents
+
+### 4B - Airports
+
+### 4C - Join Incident Airports 
+
+### 4D - Conditions 
+
+### 4E - Airlines
+
+### 4F - Join Incidents Airlines 
+
+### 4G - Test Code to ensure the tables are properly set up 
+
+## Load Data (Task 6)
+
+## Show Table Heads (Task 7)
+
+## States with the most bird strikes (Task 8)
+
+## Airlines with above average bird strikes (Task 9)
+
+## Birdstrikes by month and fligth phase (Task 10)
+
+## Birdstrike Scatter Plot (Task 11)
+
+## Stored Procedure for adding an incident to the database (Task 12)
+
