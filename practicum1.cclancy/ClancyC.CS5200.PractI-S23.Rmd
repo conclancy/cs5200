@@ -22,6 +22,25 @@ dbcon <- dbConnect(MySQL(), user = db_user, password = db_password,
 ## Create Database (Task 4)
 
 ### 4A - Incidents
+```{sql connection=dbcon}
+DROP TABLE IF EXISTS incidents;
+```
+
+```{sql connection=dbcon}
+CREATE TABLE incidents (
+  rid INT PRIMARY KEY,
+  `dep.date` DATE,
+  origin INT,
+  airline INT, 
+  aircraft VARCHAR(255) NOT NULL,
+  `flight.phase` ENUM('takeoff', 'landing', 'inflight', 'unknown'),
+  altitude INT,
+  conditions INT, 
+  warned TINYINT,
+  CHECK(altitude>=0)
+);
+```
+
 
 ### 4B - Airports
 
