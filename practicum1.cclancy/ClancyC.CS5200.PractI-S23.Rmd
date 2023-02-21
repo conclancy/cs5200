@@ -22,11 +22,11 @@ dbcon <- dbConnect(MySQL(), user = db_user, password = db_password,
 ## Create Database (Task 4)
 
 ### 4A - Incidents
-```{sql connection=dbcon}
+```{sql dropTableIncidents, connection=dbcon}
 DROP TABLE IF EXISTS incidents;
 ```
 
-```{sql connection=dbcon}
+```{sql createTableIncidents, connection=dbcon}
 CREATE TABLE incidents (
   rid INT PRIMARY KEY,
   `dep.date` DATE,
@@ -41,10 +41,40 @@ CREATE TABLE incidents (
 );
 ```
 
-
 ### 4B - Airports
+```{sql dropTableAirports, connection=dbcon}
+DROP TABLE IF EXISTS airports;
+```
 
-### 4C - Join Incident Airports 
+```{sql createTableAirports, connection=dbcon}
+CREATE TABLE airports(
+  aid INT AUTO_INCREMENT PRIMARY KEY,
+  airportName VARCHAR(255) NOT NULL,
+  airportCode VARCHAR(3),
+  state VARCHAR(255)
+)
+```
+
+### 4C - Foreign Key Incident Airports 
+```{r dropFKIncidentsAirports}
+# Query the database for the foreign key
+iac <- dbGetQuery(dbcon, 
+  "SELECT TRUE
+  FROM information_schema.table_constraints
+  WHERE constraint_name = 'FK_IncidentAirports';"
+  )
+
+# If the foreign key exist, delete it
+if (nrow(iac) > 0) {
+  dbExecute(dbcon, "ALTER TABLE incidents DROP FOREIGN KEY FK_IncidentAirports;")
+}
+```
+
+```{sql connection=dbcon}
+ALTER TABLE incidents
+ADD CONSTRAINT FK_IncidentAirports 
+FOREIGN KEY (origin) REFERENCES airports(aid);
+```
 
 ### 4D - Conditions 
 
