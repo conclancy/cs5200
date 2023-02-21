@@ -19,6 +19,37 @@ dbcon <- dbConnect(MySQL(), user = db_user, password = db_password,
                    dbname = db_name, host = db_host, port = db_port)
 ```
 
+## Create Helper R Functions 
+```{r}
+#' Method to check the existence of a foreign key and delete it if it exists.
+#' If a foreign key already exists in a database this can cause problems for
+#' dropping or altering the database.
+#' 
+#' @param fk_name the name of the foreign key to be checked
+#' @return void
+#' 
+delete_fk <- function(fk_name) {
+  # Query the database for the foreign key
+  iac <- dbGetQuery(dbcon, 
+    sprintf(
+      "SELECT TRUE
+      FROM information_schema.table_constraints
+      WHERE constraint_name = '%s';", fk_name
+    )
+  )
+  
+  # If the foreign key exist, delete it
+  if (nrow(iac) > 0) {
+    dbExecute(dbcon, 
+      sprintf(
+        "ALTER TABLE incidents DROP FOREIGN KEY %s;", fk_name
+      )
+    )
+  }  
+}
+```
+
+
 ## Create Database (Task 4)
 
 ### 4A - Incidents
@@ -52,22 +83,12 @@ CREATE TABLE airports(
   airportName VARCHAR(255) NOT NULL,
   airportCode VARCHAR(3),
   state VARCHAR(255)
-)
+);
 ```
 
 ### 4C - Foreign Key Incident Airports 
 ```{r dropFKIncidentsAirports}
-# Query the database for the foreign key
-iac <- dbGetQuery(dbcon, 
-  "SELECT TRUE
-  FROM information_schema.table_constraints
-  WHERE constraint_name = 'FK_IncidentAirports';"
-  )
-
-# If the foreign key exist, delete it
-if (nrow(iac) > 0) {
-  dbExecute(dbcon, "ALTER TABLE incidents DROP FOREIGN KEY FK_IncidentAirports;")
-}
+delete_fk('FK_IncidentAirports')
 ```
 
 ```{sql connection=dbcon}
@@ -77,7 +98,27 @@ FOREIGN KEY (origin) REFERENCES airports(aid);
 ```
 
 ### 4D - Conditions 
+```{sql dropTableConditions, connection=dbcon}
+DROP TABLE IF EXISTS conditions;
+```
 
+```{sql createTableConditions, connection=dbcon}
+CREATE TABLE conditions(
+  cid INT AUTO_INCREMENT PRIMARY KEY,
+  `condition` VARCHAR(255) NOT NULL,
+  explanation VARCHAR(255)
+);
+```
+
+```{r dropFKIncidentsConditions}
+delete_fk('FK_IncidentConditions')
+```
+
+```{sql dropIncidentConditionFK, connection=dbcon}
+ALTER TABLE incidents
+ADD CONSTRAINT FK_IncidentConditions 
+FOREIGN KEY (conditions) REFERENCES conditions(cid);
+```
 ### 4E - Airlines
 
 ### 4F - Join Incidents Airlines 
