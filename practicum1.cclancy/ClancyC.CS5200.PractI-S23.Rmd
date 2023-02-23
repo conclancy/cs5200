@@ -119,11 +119,35 @@ ALTER TABLE incidents
 ADD CONSTRAINT FK_IncidentConditions 
 FOREIGN KEY (conditions) REFERENCES conditions(cid);
 ```
+
 ### 4E - Airlines
+```{sql dropTableConditions, connection=dbcon}
+DROP TABLE IF EXISTS airlines;
+```
+
+```{sql createTableConditions, connection=dbcon}
+CREATE TABLE airlines(
+  eid INT AUTO_INCREMENT PRIMARY KEY,
+  airlineName VARCHAR(255) NOT NULL,
+  airlineCode VARCHAR(2),
+  flag VARCHAR(255)
+);
+```
 
 ### 4F - Join Incidents Airlines 
+```{r dropFKIncidentsConditions}
+delete_fk('FK_IncidentAirline')
+```
+
+```{sql dropIncidentConditionFK, connection=dbcon}
+ALTER TABLE incidents
+ADD CONSTRAINT FK_IncidentAirline 
+FOREIGN KEY (airline) REFERENCES airlines(eid);
+```
 
 ### 4G - Test Code to ensure the tables are properly set up 
+
+#### Test Inserts 
 
 ## Load Data (Task 6)
 
