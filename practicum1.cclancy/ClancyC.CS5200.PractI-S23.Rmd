@@ -59,7 +59,7 @@ DROP TABLE IF EXISTS incidents;
 
 ```{sql createTableIncidents, connection=dbcon}
 CREATE TABLE incidents (
-  rid INT PRIMARY KEY,
+  rid INT AUTO_INCREMENT PRIMARY KEY,
   `dep.date` DATE,
   origin INT,
   airline INT, 
@@ -148,6 +148,8 @@ FOREIGN KEY (airline) REFERENCES airlines(eid);
 ### 4G - Test Code to ensure the tables are properly set up 
 
 #### Test Inserts 
+
+##### Airline Table Tests
 ```{sql testAirlinesInsert, connection=dbcon, eval=F}
 INSERT INTO airlines (airlineName, airlineCode) VALUES 
   ('American Airlines', 'AA'),
@@ -162,6 +164,8 @@ SELECT
   * 
 FROM airlines;
 ```
+
+##### Conditions Table Tests
 ```{sql testConditionsInsert, connection=dbcon, eval=F}
 INSERT INTO conditions (`condition`, explanation) VALUES 
   ('clear', 'clear skies'),
@@ -173,6 +177,51 @@ SELECT
   * 
 FROM conditions;
 ```
+
+##### Airport Table Tests
+```{sql testAirportInserts, connection=dbcon, eval=F}
+INSERT INTO airports (airportName, airportCode, state) VALUES 
+  ('Boston Logan International Airport', 'BOS', 'MA'), 
+  ('Seattle-Tacoma International Airport', 'SEA', 'WA'),
+  ('Vancouver International Airport', 'YVR', 'BC');
+```
+
+```{sql testAirportSelect, connection=dbcon, eval=F}
+SELECT 
+  * 
+FROM airports;
+```
+
+##### Incidents Table Tests
+```{sql testIncidentsInsert, connection=dbcon}
+INSERT INTO incidents (`dep.date`, origin, airline, aircraft, `flight.phase`, altitude, conditions, warned) VALUES 
+  ('2023-02-24', 1, 3, 'A321-200', 'takeoff', 32, 2, 1),
+  ('2023-02-26', 2, 1, '737 MAX 9', 'landing', 189, 1, 0);
+```
+
+```{sql testIncidentSelect, connection=dbcon, eval=F}
+SELECT 
+  * 
+FROM incidents;
+```
+
+##### Clean-Up Test Data 
+```{sql testIncidentsDelete, connection=dbcon, eval=F}
+DELETE FROM incidents WHERE 1=1;
+```
+
+```{sql testAirlineDelete, connection=dbcon, eval=F}
+DELETE FROM airlines WHERE 1=1;
+```
+
+```{sql testConditionDelete, connection=dbcon, eval=F}
+DELETE FROM conditions WHERE 1=1;
+```
+
+```{sql testAirportsDelete, connection=dbcon, eval=F}
+DELETE FROM airports WHERE 1=1;
+```
+
 ## Load Data (Task 6)
 
 ## Show Table Heads (Task 7)
