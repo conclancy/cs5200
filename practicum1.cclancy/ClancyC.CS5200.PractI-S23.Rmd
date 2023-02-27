@@ -121,11 +121,11 @@ FOREIGN KEY (conditions) REFERENCES conditions(cid);
 ```
 
 ### 4E - Airlines
-```{sql dropTableConditions, connection=dbcon}
+```{sql dropTableAirlines, connection=dbcon}
 DROP TABLE IF EXISTS airlines;
 ```
 
-```{sql createTableConditions, connection=dbcon}
+```{sql createTableAirlines, connection=dbcon}
 CREATE TABLE airlines(
   eid INT AUTO_INCREMENT PRIMARY KEY,
   airlineName VARCHAR(255) NOT NULL,
@@ -135,11 +135,11 @@ CREATE TABLE airlines(
 ```
 
 ### 4F - Join Incidents Airlines 
-```{r dropFKIncidentsConditions}
+```{r dropFKIncidentsAirlines}
 delete_fk('FK_IncidentAirline')
 ```
 
-```{sql dropIncidentConditionFK, connection=dbcon}
+```{sql dropFKIncidentsAirlinesFK, connection=dbcon}
 ALTER TABLE incidents
 ADD CONSTRAINT FK_IncidentAirline 
 FOREIGN KEY (airline) REFERENCES airlines(eid);
@@ -148,7 +148,31 @@ FOREIGN KEY (airline) REFERENCES airlines(eid);
 ### 4G - Test Code to ensure the tables are properly set up 
 
 #### Test Inserts 
+```{sql testAirlinesInsert, connection=dbcon, eval=F}
+INSERT INTO airlines (airlineName, airlineCode) VALUES 
+  ('American Airlines', 'AA'),
+  ('Delta', 'DL'),
+  ('jetBlue', 'B6'),
+  ('Southwest', 'WN'),
+  ('United', 'UA');
+```
 
+```{sql testAirlinesSelect, connection=dbcon, eval=F}
+SELECT 
+  * 
+FROM airlines;
+```
+```{sql testConditionsInsert, connection=dbcon, eval=F}
+INSERT INTO conditions (`condition`, explanation) VALUES 
+  ('clear', 'clear skies'),
+  ('overcast', 'light clounds');
+```
+
+```{sql testConditionsSelect, connection=dbcon, eval=F}
+SELECT 
+  * 
+FROM conditions;
+```
 ## Load Data (Task 6)
 
 ## Show Table Heads (Task 7)
