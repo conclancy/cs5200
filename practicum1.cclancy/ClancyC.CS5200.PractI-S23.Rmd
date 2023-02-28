@@ -22,7 +22,7 @@ dbcon <- dbConnect(MySQL(), user = db_user, password = db_password,
 ```
 
 ## Create Helper R Functions 
-```{r}
+```{r helperFunctions}
 #' Method to check the existence of a foreign key and delete it if it exists.
 #' If a foreign key already exists in a database this can cause problems for
 #' dropping or altering the database.
@@ -49,8 +49,18 @@ delete_fk <- function(fk_name) {
     )
   }  
 }
-```
 
+#' Method to take in a date string formatted m/d/yyyy and return it as a 
+#' properly formatted R date. 
+#' 
+#' @param ds the date string to be transformed
+#' @return date formatted version of the input string.
+#' 
+format_date <- function(ds) {
+  td <- strsplit(ds, "/")[[1]]
+  return(paste(td[3],td[1],td[2], sep="/"))
+}
+```
 
 ## Create Database (Task 4)
 
@@ -323,7 +333,7 @@ bds.incidents <- sqldf("
                         model AS aircraft, 
                         flight_phase AS `flight.phase`, 
                         CAST(REPLACE(altitude_ft, ',','') AS INT) AS altitude,
-                        sky_conditions AS condition, 
+                        sky_conditions AS conditions, 
                         CASE
                           WHEN pilot_warned_flag = 'Y' THEN 1 
                           ELSE 0 
@@ -334,6 +344,11 @@ bds.incidents <- sqldf("
 # Create the artificial primary key with a counter 
 n.incidents <- nrow(bds.incidents)
 bds.incidents[,1] <- seq(1, n.incidents)
+
+# Format date column
+for (r in 1:n.incidents) {
+  bds.incidents$dep.date[r] = format_date(bds.incidents$dep.date[r])
+}
 
 # Link `airline` foreign key 
 for (r in 1:n.incidents) {
@@ -361,18 +376,22 @@ for (r in 1:n.incidents) {
 
 # Link `condition` foreign key 
 for (r in 1:n.incidents) {
-  cid <- bds.conditions$cid[which(bds.conditions$condition == bds.incidents$condition[r])]
+  cid <- bds.conditions$cid[which(bds.conditions$condition == bds.incidents$conditions[r])]
   
   # incidents with a blank condition get a NULL value
   if(length(cid) != 0) {
-    bds.incidents$condition[r] <- cid
+    bds.incidents$conditions[r] <- cid
   } else {
-    bds.incidents$condition[r] <- NA
+    bds.incidents$conditions[r] <- NA
   }
 }
 
 # Display the data frame to make sure it looks correct
 head(bds.incidents)
+```
+
+```{r writeIncidentsTable}
+dbWriteTable(dbcon, "incidents", bds.incidents, overwrite = F, append = T, row.names = FALSE)
 ```
 
 
