@@ -255,7 +255,10 @@ head(bds.raw)
 bds.airlines <- sqldf("
                       SELECT DISTINCT 
                         0 AS eid,
-                        trim(airline, '*') AS airlineName,
+                        CASE 
+                          WHEN airline = 'N/A' THEN 'unknown'
+                          ELSE trim(airline, '*') 
+                        END AS airlineName,
                         NULL AS airlineCode, 
                         NULL AS flag
                       FROM `bds.raw` 
@@ -288,14 +291,17 @@ dbWriteTable(
 bds.airports <- sqldf("
                       SELECT DISTINCT 
                         0 AS aid,
-                        airport AS airportName,
+                        CASE 
+                          WHEN airport = '' THEN 'unknown'
+                          ELSE airport
+                        END AS airportName,
                         NULL AS airportCode, 
                         CASE 
+                          WHEN airport = '' THEN NULL
                           WHEN origin = 'N/A' THEN NULL 
                           ELSE origin 
                         END AS state
                       FROM `bds.raw` 
-                      WHERE TRIM(airport, ' ') != ''
                       ORDER BY airport
                       ")
 
