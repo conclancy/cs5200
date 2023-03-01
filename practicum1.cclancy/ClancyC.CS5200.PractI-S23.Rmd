@@ -1,8 +1,8 @@
 ---
-title: 'Practicum I - Bird Strike Database'
-author: 
-- 'Connor Clancy'
-date: 'Spring 2023'
+title: "Practicum I - Bird Strike Database"
+author: "Connor Clancy - clancy.co@northeastern.edu"
+date: "Spring 2023"
+output: pdf_document
 ---
 
 ## Libary Imports
@@ -80,7 +80,8 @@ CREATE TABLE incidents (
   origin INT,
   airline INT, 
   aircraft VARCHAR(255) NOT NULL,
-  `flight.phase` ENUM('Climb', 'Landing Roll', 'Approach', 'Take-off run', 'Descent', 'Taxi', 'Parked'),
+  `flight.phase` ENUM('Climb', 'Landing Roll', 'Approach', 'Take-off run', 
+                      'Descent', 'Taxi', 'Parked'),
   altitude INT,
   conditions INT, 
   warned TINYINT,
@@ -210,7 +211,8 @@ FROM airports;
 
 ##### Incidents Table Tests
 ```{sql testIncidentsInsert, connection=dbcon, eval=F}
-INSERT INTO incidents (`dep.date`, origin, airline, aircraft, `flight.phase`, altitude, conditions, warned) VALUES 
+INSERT INTO incidents (`dep.date`, origin, airline, aircraft, `flight.phase`, 
+                      altitude, conditions, warned) VALUES 
   ('2023-02-24', 1, 3, 'A321-200', 'takeoff', 32, 2, 1),
   ('2023-02-26', 2, 1, '737 MAX 9', 'landing', 189, 1, 0);
 ```
@@ -270,7 +272,14 @@ head(bds.airlines)
 ```
 
 ```{r writeAirlineTable}
-dbWriteTable(dbcon, "airlines", bds.airlines, overwrite = F, append = T, row.names = FALSE)
+dbWriteTable(
+  dbcon, 
+  "airlines", 
+  bds.airlines, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
 ```
 
 ### Airports Data Population
@@ -299,7 +308,14 @@ head(bds.airports)
 ```
 
 ```{r writeAirportTable}
-dbWriteTable(dbcon, "airports", bds.airports, overwrite = F, append = T, row.names = FALSE)
+dbWriteTable(
+  dbcon, 
+  "airports", 
+  bds.airports, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
 ```
 
 ### Condition Data Population
@@ -323,7 +339,14 @@ head(bds.conditions)
 ```
 
 ```{r writeConditionsTable}
-dbWriteTable(dbcon, "conditions", bds.conditions, overwrite = F, append = T, row.names = FALSE)
+dbWriteTable(
+  dbcon, 
+  "conditions", 
+  bds.conditions, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
 ```
 
 ### Incidents Data Population
@@ -357,7 +380,9 @@ for (r in 1:n.incidents) {
 
 # Link `airline` foreign key 
 for (r in 1:n.incidents) {
-  eid <- bds.airlines$eid[which(bds.airlines$airlineName == bds.incidents$airline[r])]
+  eid <- bds.airlines$eid[
+    which(bds.airlines$airlineName == bds.incidents$airline[r])
+  ]
   
   # incidents with a blank airline get a NULL value
   if(length(eid) != 0) {
@@ -369,7 +394,9 @@ for (r in 1:n.incidents) {
 
 # Link `airport` foreign key 
 for (r in 1:n.incidents) {
-  aid <- bds.airports$aid[which(bds.airports$airportName == bds.incidents$origin[r])]
+  aid <- bds.airports$aid[
+    which(bds.airports$airportName == bds.incidents$origin[r])
+  ]
   
   # incidents with a blank airports get a NULL value
   if(length(aid) != 0) {
@@ -381,7 +408,9 @@ for (r in 1:n.incidents) {
 
 # Link `condition` foreign key 
 for (r in 1:n.incidents) {
-  cid <- bds.conditions$cid[which(bds.conditions$condition == bds.incidents$conditions[r])]
+  cid <- bds.conditions$cid[
+    which(bds.conditions$condition == bds.incidents$conditions[r])
+  ]
   
   # incidents with a blank condition get a NULL value
   if(length(cid) != 0) {
@@ -396,7 +425,14 @@ head(bds.incidents)
 ```
 
 ```{r writeIncidentsTable}
-dbWriteTable(dbcon, "incidents", bds.incidents, overwrite = F, append = T, row.names = FALSE)
+dbWriteTable(
+  dbcon, 
+  "incidents", 
+  bds.incidents, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
 ```
 
 
@@ -534,14 +570,14 @@ BEGIN
   DECLARE airlineId INT DEFAULT 0;
   DECLARE conditionsId INT DEFAULT 0; 
     
-  # Get airport primary key, or create a new airport if the input airport does not exist 
+  # Get airport primary key, or create a new airport if it does not exist 
   SELECT aid INTO airportId FROM airports WHERE airportName = airport_name;
   IF airportId = 0 THEN
   	INSERT INTO airports (airportName) VALUES (airport_name);
   	SELECT aid INTO airportId FROM airports WHERE airportName = airport_name;
   END IF;
 	
-  # Get airline primary key, or create a new airline if the input airline does not exist 
+  # Get airline primary key, or create a new airline if it does not exist 
   SELECT eid INTO airlineId FROM airlines WHERE airlineName = airline_name;
 	IF airlineId = 0 THEN 
 		INSERT INTO airlines (airlineName) VALUES (airline_name);
@@ -549,17 +585,38 @@ BEGIN
 	END IF;
     
   # Get conditions primary key
-  SELECT cid INTO conditionsId FROM conditions WHERE `condition` = condition_type;
+  SELECT cid 
+  INTO conditionsId 
+  FROM conditions 
+  WHERE `condition` = condition_type;
   
   # Add new incident to the database 
-  INSERT INTO incidents (`dep.date`, origin, airline, aircraft, `flight.phase`, altitude, conditions, warned) 
-  VALUES (dep_date, airportId, airlineId, aircraft_type, flight_phase, altitude_ft, conditionsId, warned_flag);
+  INSERT INTO incidents (
+    `dep.date`, 
+    origin, 
+    airline, aircraft, 
+    `flight.phase`, 
+    altitude, 
+    conditions, 
+    warned
+  ) 
+  VALUES (
+    dep_date, 
+    airportId, 
+    airlineId, 
+    aircraft_type, 
+    flight_phase, 
+    altitude_ft, 
+    conditionsId, 
+    warned_flag
+  );
     
 END
 ```
 
 ```{sql testSpAddIncident, connection=dbcon}
-CALL spAddIncident("2023-01-01", "Northeastern", "Avelo", "Connor 737 MAX 8", "Taxi", 10, "Overcast", 0);
+CALL spAddIncident("2023-01-01", "Northeastern", "Avelo", "Connor 737 MAX 8", 
+                  "Taxi", 10, "Overcast", 0);
 ```
 
 ```{sql visualizeSpAddIncident, connection=dbcon}
