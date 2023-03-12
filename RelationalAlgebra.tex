@@ -1,0 +1,21 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+
+\title{Relational Algebra}
+\author{Connor Clancy}
+\date{March 2023}
+
+\begin{document}
+
+\maketitle
+
+\begin{enumerate}
+    \item \textbf{Find the distinct names of all courses that meet during the "B" block in the "Spring 2023" term.} \[\pi_{cname}(Courses \bowtie_{Courses.cid = Sections.cid} \sigma_{(block = 'B')}(Sections))\]
+
+    \item \textbf{Find the distinct names of all students that took at least nine credits during the "Spring 2023" term.} \[\pi_{sname}(\sigma(Students) \bowtie_{Students.tid = Enrollment.tid} \sigma(Enrollment))\]
+\end{enumerate}
+
+\[CourseEnrollment = (Studenst \bowtie Enrollment \bowtie Sections \bowtie Courses) \]
+\[CourseHours = _{<sname>} f _{<SUM>} (\pi_{sname, hours} (\sigma_{term = 'Spring 2023'}(CourseEnrollment)))\]
+
+\end{document}
