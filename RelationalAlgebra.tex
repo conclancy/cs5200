@@ -1,9 +1,30 @@
 \documentclass{article}
 \usepackage{graphicx} % Required for inserting images
+\usepackage{listings}
+\usepackage{color}
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+\lstset{language=SQL,
+  basicstyle={\small\ttfamily},
+  belowskip=3mm,
+  breakatwhitespace=true,
+  breaklines=true,
+  classoffset=0,
+  columns=flexible,
+  commentstyle=\color{dkgreen},
+  framexleftmargin=0.25em,
+  frameshape={}{}{}{},
+  keywordstyle=\color{blue},
+  showstringspaces=false,
+  stringstyle=\color{mauve},
+  tabsize=3,
+  xleftmargin =1em
+}
 
-\title{Relational Algebra}
-\author{Connor Clancy}
-\date{March 2023}
+\title{Relational Algebra \& Calculus Expressions}
+\author{Connor Clancy - CS5200 - clancy.co@northeastern.edu}
+\date{Spring 2023}
 
 \begin{document}
 
@@ -12,10 +33,65 @@
 \begin{enumerate}
     \item \textbf{Find the distinct names of all courses that meet during the "B" block in the "Spring 2023" term.} \[\pi_{cname}(Courses \bowtie_{Courses.cid = Sections.cid} \sigma_{(block = 'B')}(Sections))\]
 
-    \item \textbf{Find the distinct names of all students that took at least nine credits during the "Spring 2023" term.} \[\pi_{sname}(\sigma(Students) \bowtie_{Students.tid = Enrollment.tid} \sigma(Enrollment))\]
-\end{enumerate}
+    \item \textbf{Find the distinct names of all students that took at least nine credits during the "Spring 2023" term.} 
+    \[\rho_{SC}(\pi_{sname, hours, sid, term}(Studenst \bowtie Enrollment \bowtie Sections 
+    \bowtie Courses))\]
+    \[\rho_{CH_{(student, TotalHours)}}(_{<sname>} f _{<SUM_{hours}>} (\sigma_{term='Spring 2023'}(SC))\]
+    \[\pi_{student} (\sigma_{TotalHours \ge 9}(CourseHours))\]
 
-\[CourseEnrollment = (Studenst \bowtie Enrollment \bowtie Sections \bowtie Courses) \]
-\[CourseHours = _{<sname>} f _{<SUM>} (\pi_{sname, hours} (\sigma_{term = 'Spring 2023'}(CourseEnrollment)))\]
+    \item \textbf{Find the distinct names of all students who major in either "Accounting" or "Business" and who scored less than 80\% in either course 91.274 or in course 14.102 (using cid).}
+    \[\rho_{Sec}(\pi_{sid}(\sigma_{(cid = 91.274) \lor (cid =14.102)}(Sections)))\]
+    \[\rho_{En}(\sigma_{grade \ge 80\%}(Sec \bowtie_{Sec.sid = Enrollment.sid} Enrollment))\]
+    \[\pi_{sname}(\sigma_{(major = Accounting) \lor (major = Business)}(En 
+    \bowtie_{En.tid=Students.tid} Students))\]
+
+    \item\textbf{Find the number of students in each course during the "Spring 2023" term assuming that a course can have several sections.}
+    \[\rho_{Spring}(\sigma_{term = Spring 2023}(Sections))\]
+    \[\rho_{SS}(Spring \bowtie_{Spring.sid=Enrollment.sid} Enrollment 
+    \bowtie_{Enrollment.tid=Students.tid} Students)\]
+    \[<cid> f <COUNT_{tid}>(SS)\]
+
+    \item \textbf{How many courses are offered during the "Spring 2023" term that have more than one section?}
+     \[\rho_{Spring}(\sigma_{term = Spring 2023}(Sections))\]
+     \[\rho_{SecCnt_{cid, sectionCount}}(<cid> f <COUNT_{sid}>(Spring))\]
+     \[\rho_{CF}(\sigma_{sectionCount > 1}(SecCnt))\]
+     \[<> f <COUNT_{cid}>(CF)\]
+
+     \item \textbf{List the names and majors of all students in the college Khoury who have a GPA below 3.0 and are not on coop.}
+     \[\pi_{sname, major}(\sigma_{(college=Khoury) \land (gpa<3) \land (onCoop=False)}(Students))\]
+
+     \item \textbf{Find the distinct names of all courses that have at least 2 but no more than 5 credit hours.}
+     \[\{c.cname: Courses(c) \land c.hours \ge 2 \land c.hours \le 5\}\]
+
+     \item \textbf{Write the equivalent tuple relational calculus expression for the SQL statement below:}
+     \begin{lstlisting}
+      SELECT sname, gpa 
+          FROM Students
+        WHERE plusOne = T AND gpa < 2.5;
+    \end{lstlisting}
+    \[\{s.sname, s.gpa: Students(s) \land s.plusOne = T \land s.gpa < 2.5\}\]
+
+    \item \textbf{Write the equivalent relational algebra expression for the SQL statement below:}
+    \begin{lstlisting}
+        SELECT sname, gpa
+            FROM Students
+          WHERE plusOne = T 
+            AND (gpa BETWEEN 2.99 AND 4.0);
+    \end{lstlisting}
+    \[\pi_{sname, gpa}(\sigma_{(plustOne = T) \land (gpa \ge 2.99) \land (gpa \le 4)}(Students))\]
+
+    \item \textbf{Write a single equivalent SQL statement for the relational algebra expression below:}
+    \[\rho_{KhourySection}(\sigma_{college='Khoury'}(Courses \bowtie Sections))\]
+    \[\pi_{term, cname, room}(\sigma_{block='G' \lor block='H'}(KhourySections)\]
+    \begin{lstlisting}
+        SELECT term, cname, room
+        FROM Courses AS c
+        INNER JOIN  Sections AS s
+            s.cid = c.cid
+        WHERE 
+            c.college = 'Khoury' 
+            AND (s.block = 'G' OR s.block = 'H')
+    \end{lstlisting}
+\end{enumerate}
 
 \end{document}
