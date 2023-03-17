@@ -1,0 +1,259 @@
+---
+title: "Assignment / Explore Query Planning"
+author: "Connor Clancy - clancy.co@northeastern.edu"
+date: "Spring 2023"
+output: pdf_document
+---
+
+# Libary Imports
+```{r libraryImports}
+library(RSQLite)
+library(RMySQL)
+library(readr)
+library(sqldf)
+options(sqldf.driver = "SQLite")
+```
+
+# Connect to SQLite Database
+```{r connectSQLite}
+fpath = getwd()
+dbfile = "/sakila.db"
+
+# connect to the database if exists, else create a new database
+lcon <- dbConnect(RSQLite::SQLite(), paste0(fpath, dbfile))
+```
+
+```{r testSQLiteConnecgtion}
+dbGetQuery(lcon, "SELECT * FROM film LIMIT 5;")
+```
+
+# Connect to MySQL Database
+```{r connectMySQL}
+db_user <- 'admin'
+db_password <- 'Northea$tern23'
+db_name <- 'sakila'
+db_host <- 'cclancy-cs5200.cbowkysg1oyc.us-east-2.rds.amazonaws.com'
+db_port <- 3306
+mscon <- dbConnect(MySQL(), user = db_user, password = db_password,
+                   dbname = db_name, host = db_host, port = db_port)
+```
+
+```{r testMySQLConnection}
+dbGetQuery(mscon, "SELECT * FROM film LIMIT 5;")
+```
+\newpage 
+# Tasks 
+
+## Question 1
+**Ensuring that no user-defined indexes exist (delete all user-defined indexes, if there are any), find the number of films per category. The query should return the category name and the number of films in each category. Show us the code that determines if there are any indexes and the code to delete them if there are any.**
+
+```{r dropIndexeFunctions}
+delete_idx <- function (tables, dbcon, database) {
+  
+  if (database == "mysql") {
+    for (t in tables) {
+      df_idx <- dbGetQuery(dbcon, sprintf("SHOW INDEXES FROM %s 
+                                          WHERE Key_name != 'PRIMARY' 
+                                          AND Key_name NOT LIKE '%%fk%%';", t))
+      
+      for (i in df_idx$Key_name) {
+        dbExecute(dbcon, sprintf("DROP INDEX %s ON %s;", i, t))
+      }
+    }
+  } else if (database == "sqlite") {
+    for (t in tables) {
+      df_idx <- dbGetQuery(dbcon, sprintf("SELECT name FROM sqlite_master 
+                                          WHERE type == 'index' 
+                                          AND tbl_name == '%s'
+                                          AND name NOT LIKE '%%autoindex%%'",t))
+      
+      for (i in df_idx$name) {
+        dbExecute(dbcon, sprintf("DROP INDEX %s", i))
+      }
+    }
+  }
+  
+}
+```
+
+```{r dropInxQOne}
+delete_idx(c('film', 'category', 'film_category'), lcon, "sqlite")
+```
+
+```{r q1}
+dbGetQuery(lcon, "
+           SELECT
+             c.category_id,
+             c.name AS category_name, 
+             COUNT(f.film_id) AS film_count
+           FROM film AS f 
+           INNER JOIN film_category AS j 
+             ON f.film_id = j.film_id
+           INNER JOIN category AS c 
+             ON c.category_id = j.category_id 
+          GROUP BY 
+             c.category_id, 
+             c.name
+          ORDER BY 
+             COUNT(f.film_id) DESC;
+           ")
+```
+
+## Question 2
+**Ensuring that no user-defined indexes exist (delete all user-defined indexes, if there are any), execute the same query (same SQL) as in (1) but against the MySQL database. Make sure you reuse the same SQL query string as in (1)**
+```{r dropInxQTwo}
+delete_idx(c('film', 'category', 'film_category'), mscon, "mysql")
+```
+
+```{r testMySQLIndexes}
+dbGetQuery(mscon, "
+           SELECT
+             c.category_id,
+             c.name AS category_name, 
+             COUNT(f.film_id) AS film_count
+           FROM film AS f 
+           INNER JOIN film_category AS j 
+             ON f.film_id = j.film_id
+           INNER JOIN category AS c 
+             ON c.category_id = j.category_id 
+          GROUP BY 
+             c.category_id, 
+             c.name
+          ORDER BY 
+             COUNT(f.film_id) DESC;
+           ")
+```
+
+## Question 3 
+**Find out how to get the query plans for SQLite and MySQL and then display the query plans for each of the query executions in (1) and (2).**
+```{r sqliteQueryPlan}
+dbGetQuery(lcon, "
+           EXPLAIN QUERY PLAN SELECT
+             c.category_id,
+             c.name AS category_name, 
+             COUNT(f.film_id) AS film_count
+           FROM film AS f 
+           INNER JOIN film_category AS j 
+             ON f.film_id = j.film_id
+           INNER JOIN category AS c 
+             ON c.category_id = j.category_id 
+          GROUP BY 
+             c.category_id, 
+             c.name
+          ORDER BY 
+             COUNT(f.film_id) DESC;
+           ")
+```
+
+```{r mySQLQueryPlan}
+dbGetQuery(mscon, "
+           EXPLAIN SELECT
+             c.category_id,
+             c.name AS category_name, 
+             COUNT(f.film_id) AS film_count
+           FROM film AS f 
+           INNER JOIN film_category AS j 
+             ON f.film_id = j.film_id
+           INNER JOIN category AS c 
+             ON c.category_id = j.category_id 
+          GROUP BY 
+             c.category_id, 
+             c.name
+          ORDER BY 
+             COUNT(f.film_id) DESC;
+           ")
+```
+
+## Question 4
+**Comment on the differences between the query plans? Are they the same? How do they differ? Why do you think they differ? Do both take the same amount of time?**
+
+The two plans are not the same.  SQLite appears to have extra steps for the `GROUP BY` and `ORDER BY` clauses that MySQL is able to handle within one of the other steps in the plan.  It appears to me that MySQL runs quicker. 
+
+## Question 5 
+**Write a SQL query against the SQLite database that returns the title, language and length of the film with the title "ZORRO ARK".**
+```{r q5}
+dbGetQuery(lcon, "
+           SELECT
+              f.title,
+              l.name AS language,
+              f.length
+           FROM film AS f
+           INNER JOIN language AS l 
+              ON f.language_id = l.language_id
+           WHERE title = 'ZORRO ARK';
+           ")
+```
+
+## Question 6 
+**For the query in (5), display the query plan.**
+```{r q6}
+dbGetQuery(lcon, "
+           EXPLAIN QUERY PLAN SELECT
+              f.title,
+              l.name AS language,
+              f.length
+           FROM film AS f
+           INNER JOIN language AS l 
+              ON f.language_id = l.language_id
+           WHERE title = 'ZORRO ARK';
+           ")
+```
+## Question 7 
+**In the SQLite database, create a user-defined index called "TitleIndex" on the column TITLE in the table FILM.**
+```{r q7}
+dbExecute(lcon, 
+           'CREATE UNIQUE INDEX IF NOT EXISTS TitleIndex 
+           ON film (title);')
+```
+
+## Question 8 
+**Re-run the query from (5) now that you have an index and display the query plan.**
+```{r q8}
+dbGetQuery(lcon, "
+           EXPLAIN QUERY PLAN SELECT
+              f.title,
+              l.name AS language,
+              f.length
+           FROM film AS f
+           INNER JOIN language AS l 
+              ON f.language_id = l.language_id
+           WHERE title = 'ZORRO ARK';
+           ")
+```
+
+## Question 9
+**Are the query plans the same in (6) and (8)? What are the differences? Is there a difference in execution time? How do you know from the query plan whether it uses an index or not?**
+
+No, the query plans are not the same.  In (6) the query scans the whole table to find the movie, where as in (8) the query plan states that it is going to use the index created to complete the search.  The query with the index performs faster. 
+
+## Question 10
+**Write a SQL query against the SQLite database that returns the title, language and length of all films with the word "GOLD" with any capitalization in its name, i.e., it should return "Gold Finger", "GOLD FINGER", "THE GOLD FINGER", "Pure GOLD" (these are not actual titles).**
+
+```{r q10}
+dbGetQuery(lcon, "
+           SELECT
+              f.title,
+              l.name AS language,
+              f.length
+           FROM film AS f
+           INNER JOIN language AS l 
+              ON f.language_id = l.language_id
+           WHERE lower(title) LIKE '%gold%';
+           ")
+```
+
+## Question 11
+**Get the query plan for (10). Does it use the index you created? If not, why do you think it didn't?**
+```{r q11}
+dbGetQuery(lcon, "
+           EXPLAIN QUERY PLAN SELECT
+              f.title,
+              l.name AS language,
+              f.length
+           FROM film AS f
+           INNER JOIN language AS l 
+              ON f.language_id = l.language_id
+           WHERE lower(title) LIKE '%gold%';
+           ")
+```
+The query does not use the Index we created because we are using a wild card to search through the column.  Since we have to search every single row for the wildcard string to see if it contains 'gold' SQLite appears to just choose to scan the whole table directly rather than using the index. 
