@@ -1,0 +1,53 @@
+---
+title: "Assignment / Query XML"
+author: "Connor Clancy - clancy.co@northeastern.edu"
+date: "Spring 2023"
+output: pdf_document
+---
+
+## Question 4
+```{r imports}
+library(XML)
+
+xmlFile <- "CustomersAndOrders.xml"
+
+dom <- xmlParse(xmlFile, validate=T)
+root <- xmlRoot(dom)
+```
+
+## Question 5 
+```{r nonMassCustomers}
+xpathEx <- "//Customers/Customer[FullAddress[Region!='MA']]/ContactName"
+
+customers <- xpathSApply(root, xpathEx, xmlValue)
+
+print(customers)
+```
+
+## Question 6
+```{r numberOfFive}
+print(length(customers))
+```
+
+## Question 7
+```{r grealFreightCosts}
+xpathEx <- "sum(//Orders/Order[CustomerID='GREAL']/ShipInfo/Freight)"
+
+orders <- xpathSApply(root, xpathEx)
+
+print(orders)
+```
+
+## Question 8 
+```{r usaAverageFreight}
+xpathEx <- "//Orders/Order/ShipInfo[ShipCountry='USA']/Freight"
+
+orders <- xpathSApply(root, xpathEx, xmlValue)
+
+freight <- as.double(orders)
+
+print(mean(freight))
+```
+
+
+
