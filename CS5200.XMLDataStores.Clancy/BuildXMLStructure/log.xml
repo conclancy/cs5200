@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE log[
+  <!ELEMENT log (page+)>
+  <!ELEMENT visit (tid, vdate, vtime, visitor)>
+  <!ELEMENT tid (#PCDATA)>
+  <!ELEMENT vdate (#PCDATA)>
+  <!ELEMENT vtime (#PCDATA)>
+  <!ELEMENT visitor (vid, ip)>
+  <!ELEMENT vid (#PCDATA)>
+  <!ELEMENT ip (#PCDATA)>
+  <!ELEMENT page (visit*)>
+  <!ATTLIST page pid CDATA #REQUIRED>
+  <!ATTLIST page url CDATA #REQUIRED>
+  ]>
+
+<log>
+  <page pid="101" url="facebook.com">
+    <visit>
+      <tid>1</tid>
+      <vdate>"2022-04-01"</vdate>
+      <vtime>"20:00:00"</vtime>
+      <visitor>
+        <vid>101</vid>
+        <ip>"123.12.12.12"</ip>
+      </visitor>
+    </visit>
+    <visit>
+      <tid>2</tid>
+      <vdate>"2022-04-01</vdate>
+      <vtime>"20:01:00</vtime>
+      <visitor>
+        <vid>101</vid>
+        <ip>"123.12.12.12"</ip>
+      </visitor>
+    </visit>
+  </page>
+  <page pid="102" url="gmail.com">
+    <visit>
+      <tid>3</tid>
+      <vdate>"2022-04-02"</vdate>
+      <vtime>"05:00:30"</vtime>
+      <visitor>
+        <vid>102</vid>
+        <ip>"0.0.0.0"</ip>
+      </visitor>
+    </visit>
+    <visit>
+      <tid>4</tid>
+      <vdate>"2022-04-02"</vdate>
+      <vtime>"10:23:03"</vtime>
+      <visitor>
+        <vid>101</vid>
+        <ip>"123.12.12.12"</ip>
+      </visitor>
+    </visit>
+  </page>
+  <page pid="103" url="northeastern.edu">
+  </page>
+</log>

@@ -1,0 +1,42 @@
+---
+title: "Assignment / Build XML Structure"
+author: "Connor Clancy - clancy.co@northeastern.edu"
+date: "Spring 2023"
+output: pdf_document
+---
+
+```{r imports}
+library(XML)
+
+xmlFile <- "log.xml"
+
+dom <- xmlParse(xmlFile, validate=T)
+root <- xmlRoot(dom)
+```
+
+```{r vistCountExtract}
+n <- xmlSize(root[[1]])
+
+visitCount <- 0
+
+for (i in 1:n) {
+  
+  node <- xmlName(root[[1]][[i]])
+  
+  if(node == "visit") {
+    visitCount <- visitCount + 1
+  }
+}
+
+print(visitCount)
+```
+
+```{r visitCountXPath}
+xpathEx <- "//page[@pid='101']/visit"
+
+visits <- xpathSApply(root, xpathEx)
+
+print(length(visits))
+```
+
+
