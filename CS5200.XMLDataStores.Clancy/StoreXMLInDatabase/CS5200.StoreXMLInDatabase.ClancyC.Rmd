@@ -7,6 +7,7 @@ output: html_document
 ```{r imports}
 library(knitr)
 library(RSQLite)
+library(sqldf)
 library(XML)
 ```
 
@@ -75,7 +76,7 @@ DROP TABLE IF EXISTS books;
 
 ```{sql createBooksTable, connection=dbcon}
 CREATE TABLE books (
-  bid INTEGER PRIMARY KEY AUTOINCREMENT,
+  bid TEXT PRIMARY KEY,
   authorId INT,
   title TEXT, 
   genreId INT, 
@@ -127,11 +128,183 @@ rawDf <- data.frame(bid = vector(mode="integer", length = numBooks),
                       )
 ```
 
-```{r}
-xpathEx <- "//catalog/book"
-books <- xpathSApply(r, xpathEx)
-print(books)
+```{r parseXMLData}
+for (book in 1:numBooks) {
+  
+  # Book Id 
+  xpBookId <- sprintf("//catalog/book[%s]/@id", book)
+  bookId <- xpathSApply(r, xpBookId)[[1]]
+  
+  # Author
+  xpBookAuth <- sprintf("//catalog/book[%s]/author", book)
+  bookAuth <- xmlValue(xpathSApply(r, xpBookAuth)[[1]])
+  
+  # Title
+  xpBookTitle <- sprintf("//catalog/book[%s]/title", book)
+  bookTitle <- xmlValue(xpathSApply(r, xpBookTitle)[[1]])
+  
+  # Genre
+  xpBookGenre <- sprintf("//catalog/book[%s]/genre", book)
+  bookGenre <- xmlValue(xpathSApply(r, xpBookGenre)[[1]])
+  
+  # Price
+  xpBookPrice <- sprintf("//catalog/book[%s]/price", book)
+  bookPrice <- xmlValue(xpathSApply(r, xpBookPrice)[[1]])
+  
+  # Publish Date
+  xpBookDate <- sprintf("//catalog/book[%s]/publish_date", book)
+  bookDate <- xmlValue(xpathSApply(r, xpBookDate)[[1]])
+    
+  # Description
+  xpBookDesc <- sprintf("//catalog/book[%s]/description", book)
+  bookDesc <- xmlValue(xpathSApply(r, xpBookDesc)[[1]])
+  
+  # Write data to the dataframe
+  rawDf[book, 1] <- bookId
+  rawDf[book, 2] <- bookAuth
+  rawDf[book, 3] <- bookTitle
+  rawDf[book, 4] <- bookGenre
+  rawDf[book, 5] <- bookPrice
+  rawDf[book, 6] <- bookDate
+  rawDf[book, 7] <- bookDesc
+}
 ```
 
+## Question 4 
+```{r pkAuthors}
 
+# get distinct author names
+authorDf <- sqldf(
+  "SELECT DISTINCT 
+    0 AS aid,
+    substr(authorId, instr(authorId, ',') + 1) AS firstName,
+    substr(authorId, 0, instr(authorId, ',')) AS lastName, 
+    authorId
+   FROM rawDf
+   ORDER BY substr(authorId, 0, instr(authorId, ','))"
+)
 
+# create a primary key for each author
+numAuths <- nrow(authorDf)
+authorDf[,1] <- seq(1, numAuths)
+
+# replace the authors name with the PK in the books table data frame
+for (r in 1:nrow(rawDf)) {
+  aid <- authorDf$aid[
+    which(authorDf$authorId == rawDf$authorId[r])
+  ]
+  
+  # incidents with a blank airline get a NULL value
+  if(length(aid) != 0) {
+    rawDf$authorId[r] <- aid
+  } else {
+    rawDf$authorId[r] <- NA
+  }
+}
+
+authorDf <- sqldf(
+  "SELECT DISTINCT 
+    aid,
+    firstName,
+    lastName
+   FROM authorDf
+   ORDER BY aid"
+)
+```
+
+```{r pkGenres}
+
+# get a distinct list of genres 
+genreDf <- sqldf(
+  "SELECT DISTINCT 
+    0 AS gid,
+    genreId AS genre
+   FROM rawDf
+   ORDER BY genreId"
+)
+
+# create a primary key for each genre
+numGenres <- nrow(genreDf)
+genreDf[,1] <- seq(1, numGenres)
+
+# replace the genre names with the PK in the books table data frame 
+for (r in 1:nrow(rawDf)) {
+  gid <- genreDf$gid[
+    which(genreDf$genre == rawDf$genreId[r])
+  ]
+  
+  # incidents with a blank airline get a NULL value
+  if(length(gid) != 0) {
+    rawDf$genreId[r] <- gid
+  } else {
+    rawDf$genreId[r] <- NA
+  }
+}
+```
+
+```{r writeDfToDb}
+dbWriteTable(dbcon, "books", rawDf, overwrite = F, append = T, row.names = FALSE)
+dbWriteTable(dbcon, "genres", genreDf, overwrite = F, append = T, row.names = FALSE)
+dbWriteTable(dbcon, "authors", authorDf, overwrite = F, append = T, row.names = FALSE)
+```
+
+#### Preview Populated Tables
+```{sql testBooksWritten, connection=dbcon}
+SELECT * FROM books LIMIT 3;
+```
+
+```{sql testAuthorsWritten, connection=dbcon}
+SELECT * FROM authors LIMIT 3;
+```
+
+```{sql testGenresWritten, connection=dbcon}
+SELECT * FROM genres LIMIT 3;
+```
+## Question 5
+
+### 5A - Genres with at least 3 books
+```{sql connection=dbcon, threeBooks}
+SELECT 
+  COUNT(1) AS genres
+FROM (
+  SELECT 
+    genreId, 
+    COUNT(bid) AS bookCount
+  FROM books
+  GROUP BY genreId
+) AS sub
+WHERE bookCount > 3
+```
+
+### 5B - Oldest Year of Publication
+```{sql connection=dbcon, oldPub}
+SELECT 
+  MIN(strftime('%Y', publishDate)) as publishYear
+FROM books
+```
+
+### 5C - Number of Books and Average Price by Genre
+```{sql connection=dbcon, genreStats}
+SELECT 
+  g.genre, 
+  COUNT(b.bid) As books, 
+  AVG(b.price) AS avgPrice
+FROM books AS b
+INNER JOIN genres AS g 
+  ON b.genreId = g.gid
+GROUP BY 
+  g.genre
+```
+
+## 5D - Price Outliers 
+```{sql connection=dbcon, priceOutliers}
+SELECT 
+  title, 
+  firstName, 
+  lastName
+FROM books 
+INNER JOIN authors 
+  ON authorId = aid
+WHERE price < (SELECT AVG(price) * .8 FROM books)
+  OR price > (SELECT AVG(price) * 1.2 FROM books)
+```
