@@ -1,0 +1,137 @@
+---
+title: "Assignment / Store XML in a Database"
+author: "Connor Clancy - clancy.co@northeastern.edu"
+date: "Spring 2023"
+output: html_document
+---
+```{r imports}
+library(knitr)
+library(RSQLite)
+library(XML)
+```
+
+## Question 1 - Schema ERD Schema
+```{r image}
+knitr::include_graphics('https://i.imgur.com/Q13TXFN.jpg')
+```
+
+## Question 2 - SQLite Schema
+```{r sqlSetUp}
+fpath = getwd()
+dbfile="/books.db"
+
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(fpath, dbfile))
+```
+
+#### Authors Table
+```{sql dropAuthorsTable, connection=dbcon}
+DROP TABLE IF EXISTS authors;
+```
+
+```{sql createAuthorsTable, connection=dbcon}
+CREATE TABLE authors (
+  aid INTEGER PRIMARY KEY AUTOINCREMENT,
+  firstName TEXT,
+  lastName TEXT
+);
+```
+
+```{sql testInsertAuthors, connection=dbcon}
+INSERT INTO authors (firstName, lastName) VALUES 
+  ('Connor', 'Clancy'),
+  ('Jane', 'Doe');
+```
+
+```{sql connection=dbcon}
+SELECT * FROM authors;
+```
+
+#### Genre Table
+```{sql dropGenresTable, connection=dbcon}
+DROP TABLE IF EXISTS genres;
+```
+
+```{sql createGenresTable, connection=dbcon}
+CREATE TABLE genres (
+  gid INTEGER PRIMARY KEY AUTOINCREMENT, 
+  genre TEXT
+);
+```
+
+```{sql testInstertGenresTable, connection=dbcon}
+INSERT INTO genres(genre) VALUES
+  ('history'),
+  ('biography')
+```
+
+```{sql testGenres, connection=dbcon}
+SELECT * FROM genres
+```
+
+#### Books Table
+```{sql dropBooksTable, connection=dbcon}
+DROP TABLE IF EXISTS books;
+```
+
+```{sql createBooksTable, connection=dbcon}
+CREATE TABLE books (
+  bid INTEGER PRIMARY KEY AUTOINCREMENT,
+  authorId INT,
+  title TEXT, 
+  genreId INT, 
+  price REAL, 
+  publishDate TEXT, 
+  description TEXT, 
+  FOREIGN KEY (authorId) REFERENCES authors(aid), 
+  FOREIGN KEY (genreId) REFERENCES genres(gid)
+);
+```
+
+```{sql testBookInserts, connection=dbcon}
+INSERT INTO books (authorId, title, genreId, price, publishDate, description) 
+  VALUES (1, "Test Book", 1, 23.99, "2023-01-01", "A test book"), 
+  (1, "Second Test Book", 2, 4.00, "2022-02-02", "Another book");
+```
+
+```{sql connection=dbcon}
+SELECT * FROM books;
+```
+#### Clear Test Data 
+```{sql clearAuthors, connection=dbcon}
+DELETE FROM authors WHERE 1=1;
+```
+
+```{sql clearGenres, connection=dbcon}
+DELETE FROM genres WHERE 1=1;
+```
+
+```{sql clearBooks, connection=dbcon}
+DELETE FROM books WHERE 1=1;
+```
+
+## Question 3 - Load XML Data into Database 
+```{r loadXMLFile}
+xmlDOM <- xmlParse("Books-v3.xml")
+r <- xmlRoot(xmlDOM)
+numBooks <- xmlSize(r)
+```
+
+```{r createRawDataframe}
+rawDf <- data.frame(bid = vector(mode="integer", length = numBooks),
+                      authorId = vector(mode="integer", length = numBooks),
+                      title = vector(mode="character", length = numBooks),
+                      genreId = vector(mode="integer", length = numBooks),
+                      price = vector(mode="numeric", length = numBooks),
+                      publishDate = vector(mode="character", length = numBooks),
+                      description = vector(mode="character", length = numBooks)
+                      )
+```
+
+```{r}
+xpathEx <- "//catalog/book"
+books <- xpathSApply(r, xpathEx)
+print(books)
+```
+
+
+
