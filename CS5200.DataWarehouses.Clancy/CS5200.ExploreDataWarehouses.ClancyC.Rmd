@@ -5,6 +5,10 @@ date: "Spring 2023"
 output: pdf_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 ## Question 1
 *Data warehouses are often constructed using relational databases. Explain the use of fact tables and star schemas to construct a data warehouse in a relational database. Also comment on whether a transactional database can and should be used to OLAP.*
 
@@ -16,6 +20,8 @@ Traditional OLTP databases can be used for analyzing data, but it is likely that
 
 ## Question 2
 *Explain the difference between a data warehouse, a data mart, and a data lake. Provide at least one example of their use from your experience or how you believe they might be used in practice. Find at least one video, article, or tutorial online that explains the differences and embed that into your notebook.*
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/GHpcLEkkmLc" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
 Data lakes are the least curated and least structured analytical data store; they tend to be raw collections of data that are being centralized from their original sources. My company uses S3 storage buckets as a data lake to act as a data centralization point entering our cloud environment.  Here you can find JSONs, CSVs, Parquete, and database table files. 
 
