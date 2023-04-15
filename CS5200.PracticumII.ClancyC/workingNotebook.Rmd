@@ -1,0 +1,278 @@
+---
+title: "Practicum II / Working Notebook"
+output: html_notebook
+---
+
+# TODO 
+[ ] Move DTD & XML to S3 bucket 
+[ ] Update XML to validate from S3 DTD 
+[ ] Move Part I to external R file 
+[X] Part I schema creation (Articles, Journals, Authors, AAJoin, Issues)
+[ ] Load XML data into the schema 
+[ ] Analyze how ISSN, Medium, and ISSN Type are related 
+[ ] Create additional lookup tables as neccessary 
+[ ] Part II star EDR 
+[ ] Part II MySQL JournalFacts Table Creation 
+[ ] Part II External Notebook
+[ ] Part III Question 1
+[ ] Part III Question 2
+[ ] Part III External Notebook
+[ ] Zip All Files 
+
+--------------------------------------------------------------------------------
+
+# Part I 
+
+## Library Imports 
+```{r libraryImports}
+library(RSQLite)
+library(sqldf)
+library(XML)
+options(sqldf.driver = "SQLite")
+```
+
+```{r partOneFunctions}
+#' Function that, if necessary creates, and connects to the publication database
+#' that will hold all of the data related to the journals, articles, and authors 
+#' 
+#' @param file_path the path to the database creation location
+#' @param file_name the name of the database, must end with the .db extension
+#' @returns connection object for the database
+#'
+database_init <- function(file_path = getwd(), file_name = "publications.db") {
+  dbcon <- dbConnect(RSQLite::SQLite(), paste0(file_path, file_name))
+  return(dbcon)
+}
+
+#' Method to check the existence of a foreign key and delete it if it exists.
+#' If a foreign key already exists in a database this can cause problems for
+#' dropping or altering the database.
+#' 
+#' @param fk_name the name of the foreign key to be checked
+#' @return void
+#' 
+delete_fk <- function(fk_name) {
+  # Query the database for the foreign key
+  iac <- dbGetQuery(dbcon, 
+    sprintf(
+      "SELECT TRUE
+      FROM information_schema.table_constraints
+      WHERE constraint_name = '%s';", fk_name
+    )
+  )
+  
+  # If the foreign key exist, delete it
+  if (nrow(iac) > 0) {
+    dbExecute(dbcon, 
+      sprintf(
+        "ALTER TABLE incidents DROP FOREIGN KEY %s;", fk_name
+      )
+    )
+  }  
+}
+
+#' Method to take in a date string formatted m/d/yyyy and return it as a 
+#' properly formatted R date. 
+#' 
+#' @param ds the date string to be transformed
+#' @return date formatted version of the input string.
+#' 
+format_date <- function(ds) {
+  td <- strsplit(ds, "/")[[1]]
+  return(paste(td[3],td[1],td[2], sep="/"))
+}
+
+#' Function that drops the authors table if it exists and create an empty table
+#' called authors with the columns aid, last_name, and forename.
+#' 
+#' @param dbcon the connection to the database
+#'
+create_table_authors <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS authors;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE authors (
+      aid INT AUTO_INCREMENT PRIMARY KEY,
+      last_name VARCHAR(255) NOT NULL, 
+      fore_name VARCHER(3) NOT NULL
+    );"
+  )
+}
+
+#' Function that drops the authors table if it exists and create an empty table
+#' with the columns aid, last_name, and forename.
+#' 
+#' @param dbcon the connection to the database
+#'
+create_table_articles <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS articles;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE articles (
+      pmid INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255) NOT NULL, 
+      issn VARCHER(9) NOT NULL
+    );"
+  )
+}
+
+#' Function that drops the article_author join table if it exists and creates an
+#' empty table with the columns aaid, pmid, aid, and valid.
+#' 
+#' @param dbcon the connection to the database 
+#'
+create_table_article_authors <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS article_authors;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE article_authors (
+      aaid INT AUTO_INCREMENT PRIMARY KEY,
+      pmid INT, 
+      aid INT, 
+      valid TINYINT,
+     FOREIGN KEY (pmid) REFERENCES articles (pmid), 
+     FOREIGN KEY (aid) REFERENCES authors (aid) 
+    );"
+  )
+}
+
+#' Function that drops the journals table if it exists and creates an empty 
+#' table with the columns jid, title, and iso_abbreviation.
+#'
+#' @param dbcon the connection to the database
+#'
+create_table_journals <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS journals;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE journals (
+      jid INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255),
+      iso_abbreviation VARCHAR(255)
+    );"
+  )
+}
+
+#' Function that drops the issues table if it exists and creates an empty table
+#' with the columns issn, jid, volume, issues, and publication-date.
+#' 
+#' @param dbcon the conbnection to the database
+#' 
+create_table_issues <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS issues;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE issues (
+      issn VARCHER(9) PRIMARY KEY,
+      jid INT, 
+      volume INT, 
+      issues INT,
+      publication_date VARCHAR(255), 
+      medium VARCHAR(255), 
+      issn_type VARCHAR(255),
+     FOREIGN KEY (jid) REFERENCES journals (jid)
+    );"
+  )
+}
+
+#' Load the XML root file.
+#'
+#' @param xml_path the path to the XML file
+#'
+get_xml_root <- function(xml_path = "./pubmed-tfm-xml/pubmed22n0001-tf.xml") {
+  xmlDOM <- xmlParse(xml_path)
+  xmlRoot <- xmlRoot(xmlDOM)
+  return(xmlRoot)
+}
+
+```
+
+```{r}
+
+```
+
+```{r partOneMain}
+# Initialize the database 
+dbcon <- database_init()
+
+# Create publication database tables 
+create_table_authors(dbcon)
+create_table_articles(dbcon)
+create_table_article_authors(dbcon)
+create_table_journals(dbcon)
+create_table_issues(dbcon)
+
+# XML parse 
+xmlRoot <- get_xml_root("./pubmed-tfm-xml/testDTD.xml")
+
+# Article Parsing 
+print(xmlSize(xmlRoot))
+
+parse_article_data(xmlRoot)
+```
+
+```{r partOneClose }
+# Close the database connection
+dbDisconnect(dbcon)
+```
+
+
+```{r}
+#'
+#'
+parse_journal_data <- function(xmlRoot, jpath) {
+  
+  issn_type <- xpathSApply(xmlRoot, paste0(jpath, "/ISSN/@IssnType"))[[1]]
+  issn <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/ISSN"))[[1]])
+  title <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/Title"))[[1]])
+  iso <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/ISOAbbreviation"))[[1]])
+  
+  ## Start here on Sunday.
+  ## Figure out how to store journal data and then begin parsing Issue data
+}
+
+#'
+#'
+parse_article_data <- function(xmlRoot) {
+  
+  articles <- xmlSize(xmlRoot)
+  
+  df_article_raw <- data.frame(
+    pmid = vector(mode = "integer", length = articles),
+    title = vector(mode = "character", length = articles)
+  )
+  
+  for(article in 1:articles) {
+    
+    article_path = sprintf("//Publications/Article[%s]/", article)
+    
+    xp_article_id <- paste0(article_path,"@PMID")
+    article_id <- xpathSApply(xmlRoot, xp_article_id)[[1]]
+    
+    xp_title <- paste0(article_path, "PubDetails/ArticleTitle")
+    article_title <- xmlValue(xpathSApply(xmlRoot, xp_title)[[1]])
+    
+    df_article_raw[article, 1] <- article_id
+    df_article_raw[article, 2] <- article_title
+    
+    parse_journal_data(xmlRoot, paste0(article_path, "PubDetails/Journal"))
+  }
+  
+  print(head(df_article_raw))
+}
+
+# XML parse 
+xmlRoot <- get_xml_root("./pubmed-tfm-xml/testDTD.xml")
+
+# Article Parsing 
+print(xmlSize(xmlRoot))
+parse_article_data(xmlRoot)
+```
+
+
+
