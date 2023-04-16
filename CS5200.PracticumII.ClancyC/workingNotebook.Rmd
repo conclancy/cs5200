@@ -223,7 +223,13 @@ dbDisconnect(dbcon)
 
 
 ```{r}
-#'
+#' Parse the journal information for a given article path's journal element. In
+#' an object-oriented language, this function would be marked private, as it is
+#' only meant to be called by the `parse_article_data` function. 
+#' 
+#' @param xmlRoot the XML root to be parsed 
+#' @param jpath the path to the desired journal element
+#' @return list of issn_type, issn, title, and ISO abbreviation for DF append 
 #'
 parse_journal_data <- function(xmlRoot, jpath) {
   
@@ -232,25 +238,46 @@ parse_journal_data <- function(xmlRoot, jpath) {
   title <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/Title"))[[1]])
   iso <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/ISOAbbreviation"))[[1]])
   
-  ## Start here on Sunday.
-  ## Figure out how to store journal data and then begin parsing Issue data
+  return(list(issn, issn_type, title, iso))
 }
 
-#'
+#' Parse article information and populate data frames with the raw data needed 
+#' to created a relational database from the passed publication XML. 
+#' 
+#' @param xmlRoot the XML root to be parsed 
+#' @return void
 #'
 parse_article_data <- function(xmlRoot) {
   
   articles <- xmlSize(xmlRoot)
   
+  ######################
+  # Create Data frames #
+  ######################
+  
+  # articles 
   df_article_raw <- data.frame(
     pmid = vector(mode = "integer", length = articles),
     title = vector(mode = "character", length = articles)
   )
   
+  # journals 
+  df_journal_raw <- data.frame (
+    issn = character(),
+    issn_type = character(),
+    title = character(),
+    iso_abbreviation = character()
+  )
+  
+  ##########################
+  # Parse XLM for Articles #
+  ##########################
+  
   for(article in 1:articles) {
     
     article_path = sprintf("//Publications/Article[%s]/", article)
     
+    # Article Data 
     xp_article_id <- paste0(article_path,"@PMID")
     article_id <- xpathSApply(xmlRoot, xp_article_id)[[1]]
     
@@ -260,10 +287,15 @@ parse_article_data <- function(xmlRoot) {
     df_article_raw[article, 1] <- article_id
     df_article_raw[article, 2] <- article_title
     
-    parse_journal_data(xmlRoot, paste0(article_path, "PubDetails/Journal"))
+    # Journal Data 
+    df_journal_raw[nrow(df_journal_raw) + 1, ] = parse_journal_data (
+      xmlRoot, 
+      paste0(article_path, "PubDetails/Journal")
+    )
   }
   
   print(head(df_article_raw))
+  print(head(df_journal_raw))
 }
 
 # XML parse 
