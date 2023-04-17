@@ -189,11 +189,6 @@ get_xml_root <- function(xml_path = "./pubmed-tfm-xml/pubmed22n0001-tf.xml") {
   xmlRoot <- xmlRoot(xmlDOM)
   return(xmlRoot)
 }
-
-```
-
-```{r}
-
 ```
 
 ```{r partOneMain}
@@ -208,37 +203,158 @@ create_table_journals(dbcon)
 create_table_issues(dbcon)
 
 # XML parse 
-xmlRoot <- get_xml_root("./pubmed-tfm-xml/testDTD.xml")
+xmlRoot <- get_xml_root("./pubmed-tfm-xml/pubmed22n0001-tf.xml")
 
-# Article Parsing 
-print(xmlSize(xmlRoot))
+######################
+# Create Data frames #
+######################
 
-parse_article_data(xmlRoot)
-```
+# articles 
+df_article_raw <- data.frame(
+  pmid = integer(),
+  title = character()
+)
 
-```{r partOneClose }
-# Close the database connection
-dbDisconnect(dbcon)
-```
+# journals 
+df_journal_raw <- data.frame (
+  pmid = integer(), 
+  issn = character(),
+  issn_type = character(),
+  title = character(),
+  iso_abbreviation = character(), 
+  cited_medium = character(),
+  volume = integer(), 
+  issue = integer(), 
+  pub_year = integer(), 
+  pub_month = character()
+)
 
+df_author_raw <- data.frame (
+  pmid = integer(), 
+  complete_list = character(),
+  valid_author = character(),
+  last_name = character(), 
+  fore_name = character(), 
+  initials = character()
+)
 
-```{r}
 #' Parse the journal information for a given article path's journal element. In
 #' an object-oriented language, this function would be marked private, as it is
 #' only meant to be called by the `parse_article_data` function. 
 #' 
 #' @param xmlRoot the XML root to be parsed 
 #' @param jpath the path to the desired journal element
+#' @param pmid the related article identifier
 #' @return list of issn_type, issn, title, and ISO abbreviation for DF append 
 #'
-parse_journal_data <- function(xmlRoot, jpath) {
+parse_journal_data <- function(xmlRoot, jpath, pmid) {
   
-  issn_type <- xpathSApply(xmlRoot, paste0(jpath, "/ISSN/@IssnType"))[[1]]
-  issn <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/ISSN"))[[1]])
+  ## issn
+  issn_path <- paste0(jpath, "/ISSN")
+  
+  test_issn <- xpathSApply(xmlRoot, paste0(paste0("boolean(", issn_path), ")"))
+  
+  if(test_issn) {
+    issn_type <- xpathSApply(xmlRoot, paste0(jpath, "/ISSN/@IssnType"))[[1]]
+    issn <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/ISSN"))[[1]])
+  } else {
+    issn_type <- ""
+    issn <- ""
+  }
+  
   title <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/Title"))[[1]])
   iso <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/ISOAbbreviation"))[[1]])
+  medium <- xpathSApply(xmlRoot, paste0(jpath, "/JournalIssue/@CitedMedium"))[[1]]
   
-  return(list(issn, issn_type, title, iso))
+  ## volume 
+  vol_path <- paste0(jpath, "/JournalIssue/Volume")
+  
+  test_vol <- xpathSApply(xmlRoot, paste0(paste0("boolean(", vol_path), ")"))
+  
+  if(test_vol) {
+    volume <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/JournalIssue/Volume"))[[1]])
+  } else {
+    volume <- -1
+  }
+  
+  ## issue 
+  iss_path <- paste0(jpath, "/JournalIssue/Issue")
+  
+  test_iss <- xpathSApply(xmlRoot, paste0(paste0("boolean(", iss_path), ")"))
+  
+  if(test_iss) {
+    issue <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/JournalIssue/Issue"))[[1]])
+  } else {
+    issue <- -1
+  }
+  
+  ## year 
+  date_path <- paste0(jpath, "/JournalIssue/PubDate")
+  
+  test_year <- xpathSApply(xmlRoot, paste0(paste0("boolean(", date_path), "/Year)"))
+  
+  if(test_year) {
+    pub_year <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/JournalIssue/PubDate/Year"))[[1]])
+  } else {
+    pub_year <- -1
+  }
+  
+  ## month 
+  test_month <- xpathSApply(xmlRoot, paste0(paste0("boolean(", date_path), "/Month)"))
+  
+  if(test_month) {
+    pub_month <- xmlValue(xpathSApply(xmlRoot, paste0(jpath, "/JournalIssue/PubDate/Month"))[[1]])
+  } else {
+    pub_month <- "unk"
+  }
+  
+  return(list(pmid, issn, issn_type, title, iso, medium, volume, issue, pub_year, pub_month))
+}
+
+#'
+#'
+parse_author_data <- function(xmlRoot, apath, pmid) {
+  complete <- xpathSApply(xmlRoot, paste0(apath, "/@CompleteYN"))[[1]]
+  
+  author_path <- paste0(apath, "/Author")
+  author_count <- xmlSize(xpathSApply(xmlRoot, author_path))
+  
+  if (author_count > 0) {
+    author_list <- vector(mode = "list", length = author_count)
+  
+    for (author in 1:author_count) {
+      element_path <- paste0(author_path, sprintf("[%s]", author))
+      
+      valid <- xpathSApply(xmlRoot, paste0(element_path, "/@ValidYN"))[[1]]
+      last <- xmlValue(xpathSApply(xmlRoot, paste0(element_path, "/LastName")))[[1]]
+      
+      ## forename 
+      test_fore <- xpathSApply(xmlRoot, paste0(paste0("boolean(", element_path), "/ForeName)"))
+      
+      if(test_fore) {
+        fore <- xmlValue(xpathSApply(xmlRoot, paste0(element_path, "/ForeName")))[[1]]
+      } else {
+        fore <- ""
+      }
+      
+      ## initials 
+      test_init <- xpathSApply(xmlRoot, paste0(paste0("boolean(", element_path), "/Initials)"))
+      
+      if(test_init) {
+        initials <- xmlValue(xpathSApply(xmlRoot, paste0(element_path, "/Initials")))[[1]]
+      } else {
+        initials <- ""
+      }
+      
+      new_author <- list(pmid, complete, valid, last, fore, initials)
+      
+      author_list[[author]] <- new_author
+    }
+  } else {
+    author_list <- list(pmid, "", "", "", "", "")
+  }
+  
+  return(author_list) 
 }
 
 #' Parse article information and populate data frames with the raw data needed 
@@ -251,24 +367,6 @@ parse_article_data <- function(xmlRoot) {
   
   articles <- xmlSize(xmlRoot)
   
-  ######################
-  # Create Data frames #
-  ######################
-  
-  # articles 
-  df_article_raw <- data.frame(
-    pmid = vector(mode = "integer", length = articles),
-    title = vector(mode = "character", length = articles)
-  )
-  
-  # journals 
-  df_journal_raw <- data.frame (
-    issn = character(),
-    issn_type = character(),
-    title = character(),
-    iso_abbreviation = character()
-  )
-  
   ##########################
   # Parse XLM for Articles #
   ##########################
@@ -277,33 +375,75 @@ parse_article_data <- function(xmlRoot) {
     
     article_path = sprintf("//Publications/Article[%s]/", article)
     
-    # Article Data 
-    xp_article_id <- paste0(article_path,"@PMID")
-    article_id <- xpathSApply(xmlRoot, xp_article_id)[[1]]
+    ## Determine if its in a journal 
+    journal_path <- paste0("boolean(", paste0(article_path, "PubDetails/Journal)")) 
+    test_journal <- xpathSApply(xmlRoot, journal_path)
     
-    xp_title <- paste0(article_path, "PubDetails/ArticleTitle")
-    article_title <- xmlValue(xpathSApply(xmlRoot, xp_title)[[1]])
-    
-    df_article_raw[article, 1] <- article_id
-    df_article_raw[article, 2] <- article_title
-    
-    # Journal Data 
-    df_journal_raw[nrow(df_journal_raw) + 1, ] = parse_journal_data (
-      xmlRoot, 
-      paste0(article_path, "PubDetails/Journal")
-    )
+    if (test_journal) {
+      # Article Data 
+      xp_article_id <- paste0(article_path,"@PMID")
+      article_id <- xpathSApply(xmlRoot, xp_article_id)[[1]]
+      
+      xp_title <- paste0(article_path, "PubDetails/ArticleTitle")
+      article_title <- xmlValue(xpathSApply(xmlRoot, xp_title)[[1]])
+      
+      df_article_raw[article, 1] <- article_id
+      df_article_raw[article, 2] <- article_title
+      
+      # Journal Data 
+      df_journal_raw[nrow(df_journal_raw) + 1, ] = parse_journal_data (
+        xmlRoot, 
+        paste0(article_path, "PubDetails/Journal"), 
+        article_id
+      )
+      
+      # Author Data 
+      authors = parse_author_data(
+        xmlRoot, 
+        paste0(article_path, "PubDetails/AuthorList"), 
+        article_id
+      )
+      
+      if (length(authors) > 0) {
+        for (author in 1:length(authors)) {
+          df_author_raw[nrow(df_author_raw) +1, ] = authors[[author]]
+        }
+      }
+    }
   }
   
   print(head(df_article_raw))
   print(head(df_journal_raw))
+  print(head(df_author_raw))
+  
+  return(list(df_article_raw, df_journal_raw, df_author_raw))
 }
-
-# XML parse 
-xmlRoot <- get_xml_root("./pubmed-tfm-xml/testDTD.xml")
 
 # Article Parsing 
 print(xmlSize(xmlRoot))
+dfs <- parse_article_data(xmlRoot)
+
+df_article_raw <- dfs[[1]]
+df_journal_raw <- dfs[[2]]
+df_author_raw <- dfs[[3]]
+
 parse_article_data(xmlRoot)
+
+# Close the database connection
+dbDisconnect(dbcon)
+```
+
+
+## Analyze breaking df into schemas
+```{r}
+sqldf(
+  "
+  SELECT 
+    * 
+  FROM df_journal_raw
+  LIMIT 10
+  "
+)
 ```
 
 

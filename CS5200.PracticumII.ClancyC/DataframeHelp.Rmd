@@ -1,0 +1,208 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# Part I 
+
+## Library Imports 
+```{r libraryImports}
+library(RSQLite)
+library(sqldf)
+library(XML)
+options(sqldf.driver = "SQLite")
+```
+```{r}
+# xmlDOM <- xmlParse("./pubmed-tfm-xml/testDTD.xml")
+xmlDOM <- xmlParse("./pubmed-tfm-xml/pubmed22n0001-tf.xml")
+root <- xmlRoot(xmlDOM)
+```
+
+```{r}
+parseJournal <- function(journalNode, pmid) {
+  tags <- names(journalNode)
+
+  # Work with the ISSN element.  If the element does not exist, the associated
+  # values for the final data frame will be `NA`.  
+  if(!is.na(which(tags == "ISSN")[1])[[1]]) {
+    
+    # Determine which tag number is associated with ISSN
+    issn_num <- which(tags == "ISSN")[[1]]
+    
+    # Return the associated values 
+    issn_type <- xmlAttrs(journalNode[[issn_num]])[[1]]
+    issn <- xmlValue(journalNode[[issn_num]])
+  } else {
+    issn_type <- NA
+    issn <- NA 
+  }
+  
+  # Title 
+  if(!is.na(which(tags == "Title")[1])[[1]]) {
+    
+    # Determine which tag number is associated with ISSN
+    tn <- which(tags == "Title")[[1]]
+    
+    # Return the associated values 
+    title <- xmlValue(journalNode[[tn]])
+  } else {
+    title <- NA
+  }
+  
+  # ISO Abbreviation 
+  if(!is.na(which(tags == "ISOAbbreviation")[1])[[1]]) {
+    
+    # Determine which tag number is associated with ISSN
+    ison <- which(tags == "ISOAbbreviation")[[1]]
+    
+    # Return the associated values 
+    iso <- xmlValue(journalNode[[ison]])
+  } else {
+    iso <- NA
+  }
+  
+  # Work with the JournalIssue element. 
+  if(!is.na(which(tags == "JournalIssue")[1])[[1]]){
+    
+    # Determine which tag number is associated
+    ji <- journalNode[[which(tags == "JournalIssue")[[1]]]]
+    
+    medium <- xmlAttrs(ji)[[1]]
+    
+    # Get a list of tags present in the journal issue element 
+    issue_tags <- names(ji)
+    
+    # Extract the Volume element if present 
+    if(!is.na(which(issue_tags == "Volume")[1])[[1]]) {
+      volume <- xmlValue(ji[[which(issue_tags == "Volume")[[1]]]])
+    } else {
+      volume <- NA
+    }
+    
+    # Extract the Issue element if present 
+    if(!is.na(which(issue_tags == "Issue")[1])[[1]]) {
+      issue <- xmlValue(ji[[which(issue_tags == "Issue")[[1]]]])
+    } else {
+      issue <- NA
+    }
+    
+    # Extract the PubDate element if present 
+    if(!is.na(which(issue_tags == "PubDate")[1])[[1]]) {
+      pubdate <- ji[[which(issue_tags == "PubDate")[[1]]]]
+      
+      date_tags <- names(pubdate)
+      
+      # Year 
+      if(!is.na(which(date_tags == "Year")[1])[[1]]) {
+        year <- as.numeric(xmlValue(pubdate[[which(date_tags == "Year")[[1]]]]))
+      } else {
+        year <- NA
+      }
+      
+      # Month
+      if(!is.na(which(date_tags == "Month")[1])[[1]]) {
+        month <- xmlValue(pubdate[[which(date_tags == "Month")[[1]]]])
+      } else {
+        month <- NA
+      }
+      
+      # Day
+      if(!is.na(which(date_tags == "Day")[1])[[1]]) {
+        day <- as.numeric(xmlValue(pubdate[[which(date_tags == "Day")[[1]]]]))
+      } else {
+        day <- NA
+      }
+      
+    } else {
+      year <- NA
+      month <- NA
+      day <- NA
+    }
+    
+  } else {
+    medium <- NA
+  }
+  
+  return(
+    data.frame(
+      pmid, 
+      issn, 
+      issn_type, 
+      title, 
+      iso, 
+      medium, 
+      volume, 
+      issue, 
+      year, 
+      month, 
+      day, 
+      stringsAsFactors = F
+    )
+  )
+}
+```
+
+```{r}
+numArticles <- xmlSize(root)
+
+# articles 
+df_article_raw <- data.frame(
+  pmid = vector(mode = "integer", length = numArticles),
+  title = vector(mode = "character", length = numArticles)
+)
+
+# journals 
+df_journal_raw <- data.frame (
+  pmid = integer(), 
+  issn = character(),
+  issn_type = character(),
+  title = character(),
+  iso_abbreviation = character(), 
+  cited_medium = character(),
+  volume = integer(), 
+  issue = integer(), 
+  pub_year = integer(), 
+  pub_month = character(), 
+  pub_day = integer()
+)
+
+df_author_raw <- data.frame (
+  pmid = integer(), 
+  complete_list = character(),
+  valid_author = character(),
+  last_name = character(), 
+  fore_name = character(), 
+  initials = character()
+)
+
+for (a in 1:numArticles) {
+  
+  # get the article node 
+  article <- root[[a]]
+  
+  # get each article's PMID
+  articlePMID <- as.numeric(xmlAttrs(article)[[1]])
+  
+  # isolate the publication details element 
+  details <- article[[1]]
+  
+  # Get the title 
+  articleTitle <- xmlValue(details[[2]])
+  
+  # Update Dataframe 
+  df_article_raw$pmid[a] <- articlePMID
+  df_article_raw$title[a] <- articleTitle
+  
+  # Parse the journal information
+  journal <- parseJournal(details[[1]], articlePMID)
+  df_journal_raw[nrow(df_journal_raw) + 1, ] <- journal[1, ]
+}
+
+head(df_article_raw)
+head(df_journal_raw)
+```
+
+```{r}
+tail(df_journal_raw)
+```
+
+
