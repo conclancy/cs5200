@@ -142,6 +142,81 @@ parseJournal <- function(journalNode, pmid) {
 ```
 
 ```{r}
+parseAuthors <- function(authorNode, pmid) {
+  
+  # Parse each author
+  authorCount <- xmlSize(authorNode)
+  
+  # Create a staging data frame 
+  df_stg_athr <- data.frame(
+    pmid = vector(mode ="integer", length = authorCount),
+    complete = vector(mode ="character", length = authorCount),
+    valid = vector(mode ="character", length = authorCount), 
+    last = vector(mode ="character", length = authorCount), 
+    fore = vector(mode ="character", length = authorCount), 
+    initials = vector(mode ="character", length = authorCount), 
+    stringsAsFactors = F
+  )
+  
+  # Author list complete flag
+  comp <- xmlAttrs(authorNode)[[1]]
+  
+  for (author in 1:authorCount) {
+    node <- authorNode[[author]]
+    
+    # Author is valid 
+    val <- xmlAttrs(node)[[1]]
+    
+    # Get the tags in Author object
+    tags <- names(node)
+    
+    if(!is.na(which(tags == "LastName")[1])[[1]]) {
+    
+      # Determine which tag number is associated with ISSN
+      lnum <- which(tags == "LastName")[[1]]
+      
+      # Return the associated values 
+      lname <- xmlValue(node[[lnum]])
+    } else {
+      lname <- NA
+    }
+    
+    if(!is.na(which(tags == "ForeName")[1])[[1]]) {
+    
+      # Determine which tag number is associated with ISSN
+      fnum <- which(tags == "ForeName")[[1]]
+      
+      # Return the associated values 
+      fname <- xmlValue(node[[fnum]])
+    } else {
+      fname <- NA
+    }
+    
+      if(!is.na(which(tags == "Initials")[1])[[1]]) {
+    
+      # Determine which tag number is associated with ISSN
+      inum <- which(tags == "Initials")[[1]]
+      
+      # Return the associated values 
+      init <- xmlValue(node[[inum]])
+    } else {
+      init <- NA
+    }
+    
+    df_stg_athr[author, 1] <- pmid
+    df_stg_athr[author, 2] <- comp
+    df_stg_athr[author, 3] <- val
+    df_stg_athr[author, 4] <- lname
+    df_stg_athr[author, 5] <- fname
+    df_stg_athr[author, 6] <- init
+  }
+  
+  return(df_stg_athr)
+}
+```
+
+
+```{r}
 numArticles <- xmlSize(root)
 
 # articles 
@@ -195,14 +270,33 @@ for (a in 1:numArticles) {
   # Parse the journal information
   journal <- parseJournal(details[[1]], articlePMID)
   df_journal_raw[nrow(df_journal_raw) + 1, ] <- journal[1, ]
+  
+  # Get the tags in Author object
+  articleTags <- names(details)
+  
+  # If the article has 
+  if(!is.na(which(articleTags == "AuthorList")[1])[[1]]) {
+    
+    atn <- which(articleTags == "AuthorList")[[1]]
+  
+    # Parse author information 
+    authors <- parseAuthors(details[[atn]], articlePMID)
+    
+    # Add authors to data frame 
+    for (author in 1:nrow(authors)) {
+      df_author_raw[nrow(df_author_raw) + 1, ] <- authors[author, ]
+    }
+  }
 }
 
 head(df_article_raw)
 head(df_journal_raw)
+head(df_author_raw)
+
+tail(df_article_raw)
+tail(df_journal_raw)
+tail(df_author_raw)
 ```
 
-```{r}
-tail(df_journal_raw)
-```
 
 
