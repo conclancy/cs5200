@@ -10,6 +10,8 @@ library(RSQLite)
 library(sqldf)
 library(XML)
 options(sqldf.driver = "SQLite")
+
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(getwd(), "publications.db"))
 ```
 ```{r}
 # xmlDOM <- xmlParse("./pubmed-tfm-xml/testDTD.xml")
@@ -298,5 +300,129 @@ tail(df_journal_raw)
 tail(df_author_raw)
 ```
 
+
+
+```{r}
+# Write Articles 
+dbWriteTable(
+  dbcon, 
+  "tbl_stg_articles", 
+  df_article_raw, 
+  overwrite = T, 
+  append = F, 
+  row.names = FALSE
+)
+
+# Write Journals 
+dbWriteTable(
+  dbcon, 
+  "tbl_stg_journals", 
+  df_journal_raw, 
+  overwrite = T, 
+  append = F, 
+  row.names = FALSE
+)
+
+# Write Authors 
+dbWriteTable(
+  dbcon, 
+  "tbl_stg_authors", 
+  df_author_raw, 
+  overwrite = T, 
+  append = F, 
+  row.names = FALSE
+)
+```
+
+```{sql connection=dbcon}
+SELECT 
+  issn, 
+  COUNT(DISTINCT cited_medium) + COUNT(DISTINCT issn_type) AS type_count
+FROM tbl_stg_journals
+WHERE issn IS NOT NULL
+GROUP BY 
+  issn 
+ORDER BY 
+  COUNT(DISTINCT cited_medium) + COUNT(DISTINCT issn_type) DESC
+;
+```
+
+```{r}
+dbDisconnect(dbcon)
+```
+
+# TODO next: build schema and foreign keys 
+```{sql connection=dbcon}
+SELECT 
+  ROW_NUMBER() OVER (
+    ORDER BY issn, title
+  ) AS jid, 
+  issn, 
+  issn_type, 
+  title, 
+  iso_abbreviation 
+FROM tbl_stg_journals
+GROUP BY 
+  issn, 
+  issn_type, 
+  title, 
+  iso_abbreviation
+;
+```
+
+```{r}
+df_journal_raw <- dbGetQuery(dbcon, "SELECT * FROM tbl_stg_journals")
+head(df_journal_raw)
+```
+
+```{r}
+df_journals <- sqldf(
+  "
+  SELECT 
+    ROW_NUMBER() OVER (
+      ORDER BY issn, title
+    ) AS jid, 
+    issn, 
+    issn_type, 
+    title, 
+    iso_abbreviation 
+  FROM df_journal_raw
+  GROUP BY 
+    issn, 
+    issn_type, 
+    title, 
+    iso_abbreviation
+  "
+)
+
+head(df_journals)
+tail(df_journals)
+```
+
+```{r}
+count_journals_raw <- nrow(df_journal_raw)
+
+for (j in 1:count_journals_raw) {
+  
+  jid <- df_journals$jid[
+    which(
+      df_journals$issn == df_journal_raw$issn[j] |
+      df_journals$title == df_journal_raw$title[j]
+    )
+  ]
+  
+  if(length(jid) != 0) {
+    df_journal_raw$jid[j] <- jid
+  } else {
+    df_journal_raw$jid[j] <- NA
+  }
+  
+}
+
+head(df_journal_raw)
+tail(df_journal_raw)
+```
+
+## Work on getting the SID for the Issues table and placing it in Articles df
 
 
