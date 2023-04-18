@@ -1,0 +1,601 @@
+---
+title: "Part One / Practicum II"
+output: html_notebook
+---
+
+```{r libraryImports}
+library(RSQLite)
+library(sqldf)
+library(XML)
+options(sqldf.driver = "SQLite")
+
+dbcon <- dbConnect(RSQLite::SQLite(), paste0(getwd(), "publications.db"))
+```
+
+## Question 5 - Realize Schema 
+```{r}
+#' Function that, if necessary creates, and connects to the publication database
+#' that will hold all of the data related to the journals, articles, and authors 
+#' 
+#' @param file_path the path to the database creation location
+#' @param file_name the name of the database, must end with the .db extension
+#' @returns connection object for the database
+#'
+database_init <- function(file_path = getwd(), file_name = "publications.db") {
+  dbcon <- dbConnect(RSQLite::SQLite(), paste0(file_path, file_name))
+  return(dbcon)
+}
+
+#' Function that drops the authors table if it exists and create an empty table
+#' called authors with the columns aid, last_name, and forename.
+#' 
+#' @param dbcon the connection to the database
+#'
+create_table_authors <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS authors;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE authors (
+      aid INT AUTO_INCREMENT PRIMARY KEY,
+      last_name VARCHAR(255) NOT NULL, 
+      fore_name VARCHER(3), 
+      initials VARCHER(3)
+    );"
+  )
+}
+
+#' Function that drops the authors table if it exists and create an empty table
+#' with the columns aid, last_name, and forename.
+#' 
+#' @param dbcon the connection to the database
+#'
+create_table_articles <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS articles;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE articles (
+      pmid INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255) NOT NULL, 
+      sid INT, 
+    FOREIGN KEY (sid) REFERENCES issues (sid), 
+    );"
+  )
+}
+
+#' Function that drops the article_author join table if it exists and creates an
+#' empty table with the columns aaid, pmid, aid, and valid.
+#' 
+#' @param dbcon the connection to the database 
+#'
+create_table_article_authors <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS article_authors;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE article_authors (
+      aaid INT AUTO_INCREMENT PRIMARY KEY,
+      pmid INT NOT NULL, 
+      aid INT NOT NULL, 
+      complete_list VARCHAR(1), 
+      valid_author VARCHAR(1)
+     FOREIGN KEY (pmid) REFERENCES articles (pmid), 
+     FOREIGN KEY (aid) REFERENCES authors (aid) 
+    );"
+  )
+}
+
+#' Function that drops the journals table if it exists and creates an empty 
+#' table with the columns jid, title, and iso_abbreviation.
+#'
+#' @param dbcon the connection to the database
+#'
+create_table_journals <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS journals;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE journals (
+      jid INT AUTO_INCREMENT PRIMARY KEY,
+      issn VARCHAR(9), 
+      title VARCHAR(255),
+      iso_abbreviation VARCHAR(255)
+    );"
+  )
+}
+
+#' Function that drops the issues table if it exists and creates an empty table
+#' with the columns issn, jid, volume, issues, and publication-date.
+#' 
+#' @param dbcon the connection to the database
+#' 
+create_table_issues <- function(dbcon) {
+  dbExecute(dbcon, "DROP TABLE IF EXISTS issues;")
+  
+  dbExecute(
+    dbcon, 
+    "CREATE TABLE issues (
+      sid INT AUTO_INCREMENT PRIMARY KEY,
+      jid INT, 
+      volume VARCHAR(255), 
+      issues VARCHAR(255),
+      pub_year INT,
+      pub_month VARCHAR(3), 
+      pub_day INT, 
+     FOREIGN KEY (jid) REFERENCES journals (jid)
+    );"
+  )
+}
+
+# Create publication database tables 
+create_table_journals(dbcon)
+create_table_issues(dbcon)
+create_table_articles(dbcon)
+create_table_authors(dbcon)
+create_table_article_authors(dbcon)
+```
+
+## Question 6 - Load the XML 
+```{r}
+# xmlDOM <- xmlParse("./pubmed-tfm-xml/testDTD.xml")
+xmlDOM <- xmlParse("./pubmed-tfm-xml/pubmed22n0001-tf.xml")
+root <- xmlRoot(xmlDOM)
+
+#' Parse an PubMed Journal Node and return the associated pmid, issn, issn_type
+#' title, iso, medium, volume, issue, year, month, and day store in a data frame
+#' that can be appended to a larger data frame.  
+#'
+#' @param journalNode the journal node to be parsed
+#' @param pmid the article id associated with the journal element
+#' @return dataframe 
+#' 
+parseJournal <- function(journalNode, pmid) {
+  tags <- names(journalNode)
+
+  # Work with the ISSN element.  If the element does not exist, the associated
+  # values for the final data frame will be `NA`.  
+  if(!is.na(which(tags == "ISSN")[1])[[1]]) {
+    
+    # Determine which tag number is associated with ISSN
+    issn_num <- which(tags == "ISSN")[[1]]
+    
+    # Return the associated values 
+    issn_type <- xmlAttrs(journalNode[[issn_num]])[[1]]
+    issn <- xmlValue(journalNode[[issn_num]])
+  } else {
+    issn_type <- NA
+    issn <- NA 
+  }
+  
+  # Title 
+  if(!is.na(which(tags == "Title")[1])[[1]]) {
+    
+    # Determine which tag number is associated with ISSN
+    tn <- which(tags == "Title")[[1]]
+    
+    # Return the associated values 
+    title <- xmlValue(journalNode[[tn]])
+  } else {
+    title <- NA
+  }
+  
+  # ISO Abbreviation 
+  if(!is.na(which(tags == "ISOAbbreviation")[1])[[1]]) {
+    
+    # Determine which tag number is associated with ISSN
+    ison <- which(tags == "ISOAbbreviation")[[1]]
+    
+    # Return the associated values 
+    iso <- xmlValue(journalNode[[ison]])
+  } else {
+    iso <- NA
+  }
+  
+  # Work with the JournalIssue element. 
+  if(!is.na(which(tags == "JournalIssue")[1])[[1]]){
+    
+    # Determine which tag number is associated
+    ji <- journalNode[[which(tags == "JournalIssue")[[1]]]]
+    
+    medium <- xmlAttrs(ji)[[1]]
+    
+    # Get a list of tags present in the journal issue element 
+    issue_tags <- names(ji)
+    
+    # Extract the Volume element if present 
+    if(!is.na(which(issue_tags == "Volume")[1])[[1]]) {
+      volume <- xmlValue(ji[[which(issue_tags == "Volume")[[1]]]])
+    } else {
+      volume <- NA
+    }
+    
+    # Extract the Issue element if present 
+    if(!is.na(which(issue_tags == "Issue")[1])[[1]]) {
+      issue <- xmlValue(ji[[which(issue_tags == "Issue")[[1]]]])
+    } else {
+      issue <- NA
+    }
+    
+    # Extract the PubDate element if present 
+    if(!is.na(which(issue_tags == "PubDate")[1])[[1]]) {
+      pubdate <- ji[[which(issue_tags == "PubDate")[[1]]]]
+      
+      date_tags <- names(pubdate)
+      
+      # Year 
+      if(!is.na(which(date_tags == "Year")[1])[[1]]) {
+        year <- as.numeric(xmlValue(pubdate[[which(date_tags == "Year")[[1]]]]))
+      } else {
+        year <- NA
+      }
+      
+      # Month
+      if(!is.na(which(date_tags == "Month")[1])[[1]]) {
+        month <- xmlValue(pubdate[[which(date_tags == "Month")[[1]]]])
+      } else {
+        month <- NA
+      }
+      
+      # Day
+      if(!is.na(which(date_tags == "Day")[1])[[1]]) {
+        day <- as.numeric(xmlValue(pubdate[[which(date_tags == "Day")[[1]]]]))
+      } else {
+        day <- NA
+      }
+      
+    } else {
+      year <- NA
+      month <- NA
+      day <- NA
+    }
+    
+  } else {
+    medium <- NA
+  }
+  
+  # Return a data frame with the parse data points
+  return(
+    data.frame(
+      pmid, 
+      issn, 
+      issn_type, 
+      title, 
+      iso, 
+      medium, 
+      volume, 
+      issue, 
+      year, 
+      month, 
+      day, 
+      stringsAsFactors = F
+    )
+  )
+}
+
+#' Parse an PubMed AuthorList Node and return the associated author(s) last
+#' name, fore name, initials, and pmid store in a data frame that can be 
+#' appended to a larger data frame.  
+#'
+#' @param authorNode the AuthorList node to be parsed
+#' @param pmid the article id associated with the AuthorList element
+#' @return dataframe 
+#' 
+parseAuthors <- function(authorNode, pmid) {
+  
+  # Parse each author
+  authorCount <- xmlSize(authorNode)
+  
+  # Create a staging data frame 
+  df_stg_athr <- data.frame(
+    pmid = vector(mode ="integer", length = authorCount),
+    complete = vector(mode ="character", length = authorCount),
+    valid = vector(mode ="character", length = authorCount), 
+    last = vector(mode ="character", length = authorCount), 
+    fore = vector(mode ="character", length = authorCount), 
+    initials = vector(mode ="character", length = authorCount), 
+    stringsAsFactors = F
+  )
+  
+  # Author list complete flag
+  comp <- xmlAttrs(authorNode)[[1]]
+  
+  for (author in 1:authorCount) {
+    node <- authorNode[[author]]
+    
+    # Author is valid 
+    val <- xmlAttrs(node)[[1]]
+    
+    # Get the tags in Author object
+    tags <- names(node)
+    
+    if(!is.na(which(tags == "LastName")[1])[[1]]) {
+    
+      # Determine which tag number is associated with ISSN
+      lnum <- which(tags == "LastName")[[1]]
+      
+      # Return the associated values 
+      lname <- xmlValue(node[[lnum]])
+    } else {
+      lname <- NA
+    }
+    
+    if(!is.na(which(tags == "ForeName")[1])[[1]]) {
+    
+      # Determine which tag number is associated with ISSN
+      fnum <- which(tags == "ForeName")[[1]]
+      
+      # Return the associated values 
+      fname <- xmlValue(node[[fnum]])
+    } else {
+      fname <- NA
+    }
+    
+      if(!is.na(which(tags == "Initials")[1])[[1]]) {
+    
+      # Determine which tag number is associated with ISSN
+      inum <- which(tags == "Initials")[[1]]
+      
+      # Return the associated values 
+      init <- xmlValue(node[[inum]])
+    } else {
+      init <- NA
+    }
+    
+    # Add the author to the data frame
+    df_stg_athr[author, 1] <- pmid
+    df_stg_athr[author, 2] <- comp
+    df_stg_athr[author, 3] <- val
+    df_stg_athr[author, 4] <- lname
+    df_stg_athr[author, 5] <- fname
+    df_stg_athr[author, 6] <- init
+  }
+  
+  # Return the completed Authors dataframe
+  return(df_stg_athr)
+}
+
+numArticles <- xmlSize(root)
+
+# article data frame for transforming data before SQLite load
+df_article_raw <- data.frame(
+  pmid = vector(mode = "integer", length = numArticles),
+  title = vector(mode = "character", length = numArticles)
+)
+
+# journal data frame for transforming data before SQLite load 
+df_journal_raw <- data.frame (
+  pmid = integer(), 
+  issn = character(),
+  issn_type = character(),
+  title = character(),
+  iso_abbreviation = character(), 
+  cited_medium = character(),
+  volume = integer(), 
+  issue = integer(), 
+  pub_year = integer(), 
+  pub_month = character(), 
+  pub_day = integer()
+)
+
+# author data frame for transforming data before SQLite load 
+df_author_raw <- data.frame (
+  pmid = integer(), 
+  complete_list = character(),
+  valid_author = character(),
+  last_name = character(), 
+  fore_name = character(), 
+  initials = character()
+)
+
+# Parse each article in the PubMed XML file
+for (a in 1:numArticles) {
+  
+  # get the article node 
+  article <- root[[a]]
+  
+  # get each article's PMID
+  articlePMID <- as.numeric(xmlAttrs(article)[[1]])
+  
+  # isolate the publication details element 
+  details <- article[[1]]
+  
+  # Get the title 
+  articleTitle <- xmlValue(details[[2]])
+  
+  # Update article data frame 
+  df_article_raw$pmid[a] <- articlePMID
+  df_article_raw$title[a] <- articleTitle
+  
+  # Parse the journal information
+  journal <- parseJournal(details[[1]], articlePMID)
+  df_journal_raw[nrow(df_journal_raw) + 1, ] <- journal[1, ]
+  
+  # Get the tags in Author object
+  articleTags <- names(details)
+  
+  # If the article has authors listed, add them to the data frame
+  if(!is.na(which(articleTags == "AuthorList")[1])[[1]]) {
+    
+    atn <- which(articleTags == "AuthorList")[[1]]
+  
+    # Parse author information 
+    authors <- parseAuthors(details[[atn]], articlePMID)
+    
+    # Add authors to data frame 
+    for (author in 1:nrow(authors)) {
+      df_author_raw[nrow(df_author_raw) + 1, ] <- authors[author, ]
+    }
+  }
+}
+
+# Create an artificial primary key for the Journals data set
+df_journals <- sqldf(
+  "
+  SELECT 
+    ROW_NUMBER() OVER (
+      ORDER BY issn, title
+    ) AS jid, 
+    issn, 
+    title, 
+    iso_abbreviation 
+  FROM df_journal_raw
+  GROUP BY 
+    issn, 
+    title, 
+    iso_abbreviation
+  "
+)
+
+head(df_journals)
+tail(df_journals)
+
+# Load the Journal primary keys back into the raw table so they can be used
+# to associate Issues to Journals in the final schema. 
+count_journals_raw <- nrow(df_journal_raw)
+
+for (j in 1:count_journals_raw) {
+  
+  # Assign the journal id by ISSN or title if the ISSN is NULL 
+  jid <- df_journals$jid[
+    which(
+      df_journals$issn == df_journal_raw$issn[j] |
+      df_journals$title == df_journal_raw$title[j]
+    )
+  ]
+  
+  # If a journal id cannot be assigned to a row, assign it a NULL value 
+  if(length(jid) != 0) {
+    df_journal_raw$jid[j] <- jid
+  } else {
+    df_journal_raw$jid[j] <- NA
+  }
+  
+}
+
+head(df_journal_raw)
+tail(df_journal_raw)
+
+# Create an artificial primary key for the Issues data set
+df_issues <- sqldf(
+  "
+  SELECT 
+    ROW_NUMBER() OVER (
+      ORDER BY jid, pub_year, pub_month, pub_day
+    ) AS sid, 
+    jid, 
+    volume, 
+    issue, 
+    pub_year,
+    pub_month, 
+    pub_day
+  FROM df_journal_raw
+  GROUP BY
+    jid, 
+    volume, 
+    issue, 
+    pub_year,
+    pub_month, 
+    pub_day
+  " 
+)
+
+head(df_issues)
+tail(df_issues)
+
+# Load the Issue primary keys back into the raw table so they can be used
+# to associate Articles to Issues in the final schema. 
+count_journals_raw <- nrow(df_journal_raw)
+
+for (j in 1:count_journals_raw) {
+  
+  sid <- df_issues$sid[
+    which(
+      df_issues$jid == df_journal_raw$jid[j] 
+      & (df_issues$volume == df_journal_raw$volume[j] | is.na(df_journal_raw$volume[j]))
+      & (df_issues$issue == df_journal_raw$issue[j] | is.na(df_journal_raw$issue[j]))
+      & (df_issues$pub_year == df_journal_raw$pub_year[j] | is.na(df_journal_raw$pub_year[j]))
+      & (df_issues$pub_month == df_journal_raw$pub_month[j] | is.na(df_journal_raw$pub_month[j]))
+    )
+  ]
+  
+  if(length(sid) != 0) {
+    df_journal_raw$sid[j] <- sid
+  } else {
+    df_journal_raw$sid[j] <- NA
+  }
+  
+}
+
+head(df_journal_raw)
+tail(df_journal_raw)
+
+for (a in 1:nrow(df_article_raw)) {
+  sid <- df_journal_raw$sid[
+    which(df_journal_raw$pmid == df_article_raw$pmid[a])
+  ]
+  
+  if(length(sid) != 0) {
+    df_article_raw$sid[a] <- sid
+  } else {
+    df_article_raw$sid[a] <- NA 
+  }
+}
+
+head(df_article_raw)
+tail(df_article_raw)
+
+df_authors <- sqldf(
+  "
+  SELECT 
+    ROW_NUMBER() OVER(
+      ORDER BY last_name, fore_name
+    ) AS aid, 
+    last_name, 
+    fore_name, 
+    initials
+  FROM df_author_raw
+  WHERE 
+    last_name IS NOT NULL 
+  "
+)
+
+for (a in 1:nrow(df_author_raw)) {
+  
+  aid <- df_authors$aid[
+    which(
+      df_authors$last_name == df_author_raw$last_name[a]
+      & (df_authors$fore_name == df_author_raw$fore_name[a] | is.na(df_author_raw$fore_name[a])) 
+    )
+  ]
+  
+  if(length(aid) != 0) {
+    df_author_raw$aid[a] <- aid
+  } else {
+    df_author_raw$aid[a] <- NA
+  }
+}
+
+df_article_authors <- sqldf(
+  "
+  SELECT
+    ROW_NUMBER() OVER(
+      ORDER BY pmid, aid
+    ) AS aaid, 
+    pmid, 
+    aid, 
+    complete_list, 
+    valid_author 
+  FROM df_author_raw
+  GROUP BY 
+    pmid, 
+    aid, 
+    complete_list, 
+    valid_author 
+  "
+)
+```
+
+```{r}
+# dbDisconnect(dbcon)
+```
