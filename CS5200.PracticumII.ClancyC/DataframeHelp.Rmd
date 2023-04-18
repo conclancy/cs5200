@@ -6,20 +6,36 @@ output: html_notebook
 
 ## Library Imports 
 ```{r libraryImports}
-library(RSQLite)
-library(sqldf)
+#library(RSQLite)
+#library(sqldf)
 library(XML)
-options(sqldf.driver = "SQLite")
+#options(sqldf.driver = "SQLite")
 
-dbcon <- dbConnect(RSQLite::SQLite(), paste0(getwd(), "publications.db"))
+# dbcon <- dbConnect(RSQLite::SQLite(), paste0(getwd(), "publications.db"))
 ```
+
 ```{r}
 # xmlDOM <- xmlParse("./pubmed-tfm-xml/testDTD.xml")
-xmlDOM <- xmlParse("./pubmed-tfm-xml/pubmed22n0001-tf.xml")
+xmlDOM <- xmlParse(
+  "http://cclancy-cs5200.s3.us-east-2.amazonaws.com/pubmed22n0001-tf.xml",
+  validate = T)
 root <- xmlRoot(xmlDOM)
 ```
 
 ```{r}
+xmlDOM <- xmlParse("./pubmed-tfm-xml/testDTD.xml", validate = T)
+root <- xmlRoot(xmlDOM)
+```
+
+```{r}
+#' Parse an PubMed Journal Node and return the associated pmid, issn, issn_type
+#' title, iso, medium, volume, issue, year, month, and day store in a data frame
+#' that can be appended to a larger data frame.  
+#'
+#' @param journalNode the journal node to be parsed
+#' @param pmid the article id associated with the journal element
+#' @return dataframe 
+#' 
 parseJournal <- function(journalNode, pmid) {
   tags <- names(journalNode)
 
@@ -124,6 +140,7 @@ parseJournal <- function(journalNode, pmid) {
     medium <- NA
   }
   
+  # Return a data frame with the parse data points
   return(
     data.frame(
       pmid, 
@@ -144,6 +161,14 @@ parseJournal <- function(journalNode, pmid) {
 ```
 
 ```{r}
+#' Parse an PubMed AuthorList Node and return the associated author(s) last
+#' name, fore name, initials, and pmid store in a data frame that can be 
+#' appended to a larger data frame.  
+#'
+#' @param authorNode the AuthorList node to be parsed
+#' @param pmid the article id associated with the AuthorList element
+#' @return dataframe 
+#' 
 parseAuthors <- function(authorNode, pmid) {
   
   # Parse each author
@@ -205,6 +230,7 @@ parseAuthors <- function(authorNode, pmid) {
       init <- NA
     }
     
+    # Add the author to the data frame
     df_stg_athr[author, 1] <- pmid
     df_stg_athr[author, 2] <- comp
     df_stg_athr[author, 3] <- val
@@ -213,6 +239,7 @@ parseAuthors <- function(authorNode, pmid) {
     df_stg_athr[author, 6] <- init
   }
   
+  # Return the completed Authors dataframe
   return(df_stg_athr)
 }
 ```
@@ -221,13 +248,13 @@ parseAuthors <- function(authorNode, pmid) {
 ```{r}
 numArticles <- xmlSize(root)
 
-# articles 
+# article data frame for transforming data before SQLite load
 df_article_raw <- data.frame(
   pmid = vector(mode = "integer", length = numArticles),
   title = vector(mode = "character", length = numArticles)
 )
 
-# journals 
+# journal data frame for transforming data before SQLite load 
 df_journal_raw <- data.frame (
   pmid = integer(), 
   issn = character(),
@@ -242,6 +269,7 @@ df_journal_raw <- data.frame (
   pub_day = integer()
 )
 
+# author data frame for transforming data before SQLite load 
 df_author_raw <- data.frame (
   pmid = integer(), 
   complete_list = character(),
@@ -251,6 +279,7 @@ df_author_raw <- data.frame (
   initials = character()
 )
 
+# Parse each article in the PubMed XML file
 for (a in 1:numArticles) {
   
   # get the article node 
@@ -265,7 +294,7 @@ for (a in 1:numArticles) {
   # Get the title 
   articleTitle <- xmlValue(details[[2]])
   
-  # Update Dataframe 
+  # Update article data frame 
   df_article_raw$pmid[a] <- articlePMID
   df_article_raw$title[a] <- articleTitle
   
@@ -276,7 +305,7 @@ for (a in 1:numArticles) {
   # Get the tags in Author object
   articleTags <- names(details)
   
-  # If the article has 
+  # If the article has authors listed, add them to the data frame
   if(!is.na(which(articleTags == "AuthorList")[1])[[1]]) {
     
     atn <- which(articleTags == "AuthorList")[[1]]
@@ -303,6 +332,8 @@ tail(df_author_raw)
 
 
 ```{r}
+# NOT FOR FINAL 
+
 # Write Articles 
 dbWriteTable(
   dbcon, 
@@ -371,11 +402,13 @@ GROUP BY
 ```
 
 ```{r}
+# NOT FOR FINAL 
 df_journal_raw <- dbGetQuery(dbcon, "SELECT * FROM tbl_stg_journals")
 head(df_journal_raw)
 ```
 
 ```{r}
+# Create an artificial primary key for the Journals data set
 df_journals <- sqldf(
   "
   SELECT 
@@ -383,13 +416,11 @@ df_journals <- sqldf(
       ORDER BY issn, title
     ) AS jid, 
     issn, 
-    issn_type, 
     title, 
     iso_abbreviation 
   FROM df_journal_raw
   GROUP BY 
     issn, 
-    issn_type, 
     title, 
     iso_abbreviation
   "
@@ -400,10 +431,13 @@ tail(df_journals)
 ```
 
 ```{r}
+# Load the Journal primary keys back into the raw table so they can be used
+# to associate Issues to Journals in the final schema. 
 count_journals_raw <- nrow(df_journal_raw)
 
 for (j in 1:count_journals_raw) {
   
+  # Assign the journal id by ISSN or title if the ISSN is NULL 
   jid <- df_journals$jid[
     which(
       df_journals$issn == df_journal_raw$issn[j] |
@@ -411,6 +445,7 @@ for (j in 1:count_journals_raw) {
     )
   ]
   
+  # If a journal id cannot be assigned to a row, assign it a NULL value 
   if(length(jid) != 0) {
     df_journal_raw$jid[j] <- jid
   } else {
@@ -423,6 +458,160 @@ head(df_journal_raw)
 tail(df_journal_raw)
 ```
 
-## Work on getting the SID for the Issues table and placing it in Articles df
+```{r}
+# Create an artificial primary key for the Issues data set
+df_issues <- sqldf(
+  "
+  SELECT 
+    ROW_NUMBER() OVER (
+      ORDER BY jid, pub_year, pub_month, pub_day
+    ) AS sid, 
+    jid, 
+    volume, 
+    issue, 
+    pub_year,
+    pub_month, 
+    pub_day
+  FROM df_journal_raw
+  GROUP BY
+    jid, 
+    volume, 
+    issue, 
+    pub_year,
+    pub_month, 
+    pub_day
+  " 
+)
+
+head(df_issues)
+tail(df_issues)
+```
+
+```{r}
+# Load the Issue primary keys back into the raw table so they can be used
+# to associate Articles to Issues in the final schema. 
+count_journals_raw <- nrow(df_journal_raw)
+
+for (j in 1:count_journals_raw) {
+  
+  sid <- df_issues$sid[
+    which(
+      df_issues$jid == df_journal_raw$jid[j] 
+      & (df_issues$volume == df_journal_raw$volume[j] | is.na(df_journal_raw$volume[j]))
+      & (df_issues$issue == df_journal_raw$issue[j] | is.na(df_journal_raw$issue[j]))
+      & (df_issues$pub_year == df_journal_raw$pub_year[j] | is.na(df_journal_raw$pub_year[j]))
+      & (df_issues$pub_month == df_journal_raw$pub_month[j] | is.na(df_journal_raw$pub_month[j]))
+    )
+  ]
+  
+  if(length(sid) != 0) {
+    df_journal_raw$sid[j] <- sid
+  } else {
+    df_journal_raw$sid[j] <- NA
+  }
+  
+}
+
+head(df_journal_raw)
+tail(df_journal_raw)
+```
+
+```{r}
+# NOT FOR FINAL 
+df_article_raw <- dbGetQuery(dbcon, "SELECT * FROM tbl_stg_articles")
+head(df_article_raw)
+```
+
+```{r}
+for (a in 1:nrow(df_article_raw)) {
+  sid <- df_journal_raw$sid[
+    which(df_journal_raw$pmid == df_article_raw$pmid[a])
+  ]
+  
+  if(length(sid) != 0) {
+    df_article_raw$sid[a] <- sid
+  } else {
+    df_article_raw$sid[a] <- NA 
+  }
+}
+
+head(df_article_raw)
+tail(df_article_raw)
+```
+
+```{r}
+# NOT FOR FINAL 
+df_author_raw <- dbGetQuery(dbcon, "SELECT * FROM tbl_stg_authors")
+head(df_author_raw)
+```
+
+```{r}
+df_authors <- sqldf(
+  "
+  SELECT 
+    ROW_NUMBER() OVER(
+      ORDER BY last_name, fore_name
+    ) AS aid, 
+    last_name, 
+    fore_name, 
+    initials
+  FROM df_author_raw
+  WHERE 
+    last_name IS NOT NULL 
+  "
+)
+
+head(df_authors)
+tail(df_authors)
+```
+
+```{r}
+for (a in 1:nrow(df_author_raw)) {
+  
+  aid <- df_authors$aid[
+    which(
+      df_authors$last_name == df_author_raw$last_name[a]
+      & (df_authors$fore_name == df_author_raw$fore_name[a] | is.na(df_author_raw$fore_name[a])) 
+    )
+  ]
+  
+  if(length(aid) != 0) {
+    df_author_raw$aid[a] <- aid
+  } else {
+    df_author_raw$aid[a] <- NA
+  }
+}
+
+head(df_author_raw)
+tail(df_author_raw)
+```
+
+
+```{r}
+df_article_authors <- sqldf(
+  "
+  SELECT
+    ROW_NUMBER() OVER(
+      ORDER BY pmid, aid
+    ) AS aaid, 
+    pmid, 
+    aid, 
+    complete_list, 
+    valid_author 
+  FROM df_author_raw
+  GROUP BY 
+    pmid, 
+    aid, 
+    complete_list, 
+    valid_author 
+  "
+)
+
+head(df_article_authors)
+tail(df_article_authors)
+```
+
+
+
 
 

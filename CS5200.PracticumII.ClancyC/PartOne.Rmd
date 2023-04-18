@@ -59,7 +59,7 @@ create_table_articles <- function(dbcon) {
       pmid INT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(255) NOT NULL, 
       sid INT, 
-    FOREIGN KEY (sid) REFERENCES issues (sid), 
+    FOREIGN KEY (sid) REFERENCES issues (sid)
     );"
   )
 }
@@ -79,7 +79,7 @@ create_table_article_authors <- function(dbcon) {
       pmid INT NOT NULL, 
       aid INT NOT NULL, 
       complete_list VARCHAR(1), 
-      valid_author VARCHAR(1)
+      valid_author VARCHAR(1),
      FOREIGN KEY (pmid) REFERENCES articles (pmid), 
      FOREIGN KEY (aid) REFERENCES authors (aid) 
     );"
@@ -119,7 +119,7 @@ create_table_issues <- function(dbcon) {
       sid INT AUTO_INCREMENT PRIMARY KEY,
       jid INT, 
       volume VARCHAR(255), 
-      issues VARCHAR(255),
+      issue VARCHAR(255),
       pub_year INT,
       pub_month VARCHAR(3), 
       pub_day INT, 
@@ -138,8 +138,8 @@ create_table_article_authors(dbcon)
 
 ## Question 6 - Load the XML 
 ```{r}
-# xmlDOM <- xmlParse("./pubmed-tfm-xml/testDTD.xml")
-xmlDOM <- xmlParse("./pubmed-tfm-xml/pubmed22n0001-tf.xml")
+xmlDOM <- xmlParse("./pubmed-tfm-xml/testDTD.xml")
+#xmlDOM <- xmlParse("./pubmed-tfm-xml/pubmed22n0001-tf.xml")
 root <- xmlRoot(xmlDOM)
 
 #' Parse an PubMed Journal Node and return the associated pmid, issn, issn_type
@@ -597,5 +597,52 @@ df_article_authors <- sqldf(
 ```
 
 ```{r}
-# dbDisconnect(dbcon)
+dbWriteTable(
+  dbcon, 
+  "journals", 
+  df_journals, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
+
+dbWriteTable(
+  dbcon, 
+  "issues", 
+  df_issues, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
+
+dbWriteTable(
+  dbcon, 
+  "articles", 
+  df_article_raw, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
+
+dbWriteTable(
+  dbcon, 
+  "authors", 
+  df_authors, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
+
+dbWriteTable(
+  dbcon, 
+  "article_authors", 
+  df_article_authors, 
+  overwrite = F, 
+  append = T, 
+  row.names = FALSE
+)
+```
+
+```{r}
+dbDisconnect(dbcon)
 ```
