@@ -1,0 +1,124 @@
+---
+title: "Practicum II - Part III: Analyze Data"
+author: "Connor Clancy - clancy.co@northeastern.edu"
+date: "Spring 2023"
+output: pdf_document
+---
+
+## Libary Imports
+```{r libraryImports}
+library(RMySQL)
+library(sqldf)
+options(sqldf.driver = "SQLite")
+```
+
+```{r mysqlConnection}
+# MySQL Connection
+db_user <- 'admin'
+db_password <- 'Northea$tern23'
+db_name <- 'practicumTwo'
+db_host <- 'cclancy-cs5200.cbowkysg1oyc.us-east-2.rds.amazonaws.com'
+db_port <- 3306
+
+dbcon <- dbConnect(MySQL(), user = db_user, password = db_password,
+                   dbname = db_name, host = db_host, port = db_port)
+```
+
+## Analytical Query I 
+_*Top five journals with the most articles published in them for the time period. Think about how you would best present this information so it is easily usable by an analyst or manager.*_
+
+```{sql a1, connection=dbcon}
+SELECT 
+  jid, 
+	journal_title, 
+	SUM(articles) AS articles_published
+FROM factJournals
+GROUP BY 
+  jid, 
+  journal_title 
+ORDER BY 
+  SUM(articles) DESC
+LIMIT 5
+```
+
+The chart above shows the Journals from the data set that published the most articles between January 1975 and  January 1979. 
+
+## Analytical Query II 
+_*Number of articles per journal per year broken down by quarter. Again, think of a good way to show this. Is a table better than a visualization or is it better to use a visualization.*_
+
+```{sql a2SQL, connection=dbcon}
+SELECT 
+	jid, 
+  journal_title, 
+  SUM(CASE WHEN pub_year = 1975 AND pub_quarter = 1 THEN articles ELSE 0 END) AS '1975-1',
+  SUM(CASE WHEN pub_year = 1975 AND pub_quarter = 2 THEN articles ELSE 0 END) AS '1975-2',
+  SUM(CASE WHEN pub_year = 1975 AND pub_quarter = 3 THEN articles ELSE 0 END) AS '1975-3',
+  SUM(CASE WHEN pub_year = 1975 AND pub_quarter = 4 THEN articles ELSE 0 END) AS '1975-4',
+	SUM(CASE WHEN pub_year = 1976 AND pub_quarter = 1 THEN articles ELSE 0 END) AS '1976-1',
+  SUM(CASE WHEN pub_year = 1976 AND pub_quarter = 2 THEN articles ELSE 0 END) AS '1976-2',
+  SUM(CASE WHEN pub_year = 1976 AND pub_quarter = 3 THEN articles ELSE 0 END) AS '1976-3',
+  SUM(CASE WHEN pub_year = 1976 AND pub_quarter = 4 THEN articles ELSE 0 END) AS '1976-4',
+  SUM(CASE WHEN pub_year = 1977 AND pub_quarter = 1 THEN articles ELSE 0 END) AS '1977-1',
+  SUM(CASE WHEN pub_year = 1977 AND pub_quarter = 2 THEN articles ELSE 0 END) AS '1977-2',
+  SUM(CASE WHEN pub_year = 1977 AND pub_quarter = 3 THEN articles ELSE 0 END) AS '1977-3',
+  SUM(CASE WHEN pub_year = 1977 AND pub_quarter = 4 THEN articles ELSE 0 END) AS '1977-4',
+	SUM(CASE WHEN pub_year = 1978 AND pub_quarter = 1 THEN articles ELSE 0 END) AS '1978-1',
+  SUM(CASE WHEN pub_year = 1978 AND pub_quarter = 2 THEN articles ELSE 0 END) AS '1978-2',
+  SUM(CASE WHEN pub_year = 1978 AND pub_quarter = 3 THEN articles ELSE 0 END) AS '1978-3',
+  SUM(CASE WHEN pub_year = 1978 AND pub_quarter = 4 THEN articles ELSE 0 END) AS '1978-4',
+  SUM(CASE WHEN pub_year = 1979 AND pub_quarter = 1 THEN articles ELSE 0 END) AS '1979-1',
+  SUM(articles) AS total_articles
+FROM factJournals 
+WHERE pub_year IS NOT NULL AND pub_quarter IS NOT NULL
+GROUP BY 
+	jid, 
+    journal_title
+ORDER BY 
+	SUM(articles) DESC
+```
+
+Th above chart shows all of the articles published by each journal for each quarter of the data set.  As it may be more useful to view the data trends over time, an additional chart has been provided below which shows the aggregate trends in articles being published by quarter below. 
+
+```{r a2}
+df_chart_raw <- dbGetQuery(
+  dbcon, 
+  "
+  SELECT 
+  	pub_year, 
+  	SUM(CASE WHEN pub_quarter = 1 THEN articles ELSE 0 END) AS q1,
+    SUM(CASE WHEN pub_quarter = 2 THEN articles ELSE 0 END) AS q2,
+    SUM(CASE WHEN pub_quarter = 3 THEN articles ELSE 0 END) AS q3,
+    SUM(CASE WHEN pub_quarter = 4 THEN articles ELSE 0 END) AS q4
+  FROM factJournals 
+  WHERE pub_year IS NOT NULL AND pub_quarter IS NOT NULL
+  GROUP BY pub_year
+  ORDER BY pub_year;
+  "
+)
+
+df_chart <- df_chart_raw[,-1]
+rownames(df_chart) <- df_chart_raw[,1]
+
+colors <- c("red", "blue", "yellow", "darkgreen")
+
+barplot(
+  t(as.matrix(df_chart)), beside=TRUE, 
+  xlab = "Year", 
+  ylab = " Articles", 
+  col = colors, 
+  main = "Published Articles"
+  )
+legend("topright", c("Q1", "Q2", "Q3", "Q4"), fill = colors)
+```
+```{r disconnect}
+dbDisconnect(dbcon)
+```
+
+
+
+
+
+
+
+
+
